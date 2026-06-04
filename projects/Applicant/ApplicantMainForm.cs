@@ -27,6 +27,7 @@ namespace HRApplicant
 
         private void SetupForm()
         {
+            this.WindowState = FormWindowState.Maximized;
             this.Text = "HR Applicant Portal";
             this.Size = new Size(1100, 700);
             this.MinimumSize = new Size(900, 600);

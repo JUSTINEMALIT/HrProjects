@@ -121,7 +121,7 @@ namespace HRApplicant
                 // Get jobs this applicant already applied for
                 DataTable applied = db.Query(
                     "SELECT job_vacancy_id FROM applications WHERE applicant_id=@aid",
-                    ("@aid", Session.ApplicantId));
+                    ("@aid", project.Session.ApplicantId));
                 System.Collections.Generic.HashSet<int> appliedIds = new System.Collections.Generic.HashSet<int>();
                 foreach (DataRow r in applied.Rows)
                     appliedIds.Add(Convert.ToInt32(r["job_vacancy_id"]));
@@ -224,7 +224,7 @@ namespace HRApplicant
                 string capturedTitle = title;
                 btnApply.Click += (s, e) =>
                 {
-                    var db = new DatabaseConnection(); // ← fix ng "db does not exist"
+                    var db = new DatabaseConnection();
                     var result = MessageBox.Show(
                         "Apply for \"" + capturedTitle + "\"?\n\nThis will create a new Draft application.",
                         "Confirm Application", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
@@ -234,7 +234,7 @@ namespace HRApplicant
                         // Business rule: no duplicate application
                         object dup = db.Scalar(
                             "SELECT COUNT(*) FROM applications WHERE applicant_id=@aid AND job_vacancy_id=@jid",
-                            ("@aid", Session.ApplicantId), ("@jid", capturedJobId));
+                            ("@aid", project.Session.ApplicantId), ("@jid", capturedJobId));
                         if (Convert.ToInt32(dup) > 0)
                         {
                             MessageBox.Show("You already applied for this position.", "Duplicate", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -251,12 +251,12 @@ namespace HRApplicant
 
                         int newAppId = db.InsertGetId(
                             "INSERT INTO applications (applicant_id, job_vacancy_id, status) VALUES (@aid,@jid,'Draft')",
-                            ("@aid", Session.ApplicantId), ("@jid", capturedJobId));
+                            ("@aid", project.Session.ApplicantId), ("@jid", capturedJobId));
 
                         // Initial status history
                         db.Execute(
                             "INSERT INTO application_status_history (application_id, status, remarks, changed_by) VALUES (@id,'Draft','Application created.',@who)",
-                            ("@id", newAppId), ("@who", Session.FullName));
+                            ("@id", newAppId), ("@who", project.Session.FullName));
 
                         // Auto-create document slots for required types
                         DataTable reqTypes = db.Query("SELECT id FROM requirement_types WHERE is_active=1");
