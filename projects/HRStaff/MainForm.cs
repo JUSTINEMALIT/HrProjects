@@ -11,7 +11,7 @@ namespace projects.HRStaff
         private Panel sidebarPanel;
 
         private Button btnDashboard, btnApplicantList, btnApplicantReview,
-                       btnScreening, btnInterview, btnEvaluation;
+                       btnScreening, btnInterview, btnEvaluation, btnAuditTrail;
 
         // Exposed para ma-access ng ApplicantListForm
         public Button BtnApplicantReview => btnApplicantReview;
@@ -113,6 +113,8 @@ namespace projects.HRStaff
             btnScreening = SidebarBtn("  Screening", y, "✅"); y += 46;
             btnInterview = SidebarBtn("  Interview Schedule", y, "📅"); y += 46;
             btnEvaluation = SidebarBtn("  Evaluation", y, "📝"); y += 46;
+            SectionLbl("ADMIN", y); y += 28;
+            btnAuditTrail = SidebarBtn("  Audit Trail", y, "🗂"); y += 46;
 
             // Wire events
             btnDashboard.Click += (s, e) => { SetActive(btnDashboard); LoadForm(new DashboardForm()); };
@@ -121,6 +123,7 @@ namespace projects.HRStaff
             btnScreening.Click += (s, e) => { SetActive(btnScreening); LoadForm(new ScreeningForm()); };
             btnInterview.Click += (s, e) => { SetActive(btnInterview); LoadForm(new InterviewScheduleForm()); };
             btnEvaluation.Click += (s, e) => { SetActive(btnEvaluation); LoadForm(new EvaluationForm()); };
+            btnAuditTrail.Click += (s, e) => { SetActive(btnAuditTrail); LoadForm(new AuditTrailForm()); };
 
             // ── Content ──────────────────────────────────────────────
             contentPanel = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(18, 22, 28) };
@@ -167,7 +170,7 @@ namespace projects.HRStaff
             return btn;
         }
 
-        private Button[] AllButtons => new[] { btnDashboard, btnApplicantList, btnApplicantReview, btnScreening, btnInterview, btnEvaluation };
+        private Button[] AllButtons => new[] { btnDashboard, btnApplicantList, btnApplicantReview, btnScreening, btnInterview, btnEvaluation, btnAuditTrail };
 
         public void SetActive(Button btn)
         {
