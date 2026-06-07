@@ -8,7 +8,7 @@ namespace project
     public class DatabaseConnection
     {
         private readonly string _cs =
-            "server=127.0.0.1;database=applicantsss;uid=root;pwd=marianos;CharSet=utf8mb4;";
+            "server=127.0.0.1;database=applicantsss;uid=root;pwd=;CharSet=utf8mb4;";
 
         public MySqlConnection GetConnection() => new MySqlConnection(_cs);
 
