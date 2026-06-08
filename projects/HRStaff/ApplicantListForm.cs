@@ -288,5 +288,23 @@ namespace projects.HRStaff
             if (s == "Withdrawn") return Color.FromArgb(160, 100, 80);
             return Color.FromArgb(150, 150, 150);
         }
+
+        private void InitializeComponent()
+        {
+            SuspendLayout();
+            // 
+            // ApplicantListForm
+            // 
+            ClientSize = new Size(284, 261);
+            Name = "ApplicantListForm";
+            Load += ApplicantListForm_Load;
+            ResumeLayout(false);
+
+        }
+
+        private void ApplicantListForm_Load(object sender, EventArgs e)
+        {
+
+        }
     }
 }

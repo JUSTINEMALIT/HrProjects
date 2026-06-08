@@ -103,7 +103,6 @@ namespace projects.HRStaff
                 guideCard.Controls.Add(new Label { Text = "5.  Fill in schedule details and click Schedule Interview", Font = new Font("Segoe UI", 9f), ForeColor = Color.FromArgb(150, 175, 162), Left = 16, Top = 126, AutoSize = true, BackColor = Color.Transparent });
                 this.Controls.Add(guideCard);
 
-                // Still show existing schedules
                 ShowExistingSchedules(db, 340);
                 return;
             }
@@ -254,7 +253,6 @@ namespace projects.HRStaff
                 if (cmbApp.SelectedIndex == 0) { MessageBox.Show("Please select an applicant.", "Required", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
                 if (cmbType.SelectedIndex < 0) { MessageBox.Show("Please select an interview type.", "Required", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
 
-                // Business rule: date must not be in the past
                 if (dtpDate.Value.Date < DateTime.Today.AddDays(1))
                 {
                     MessageBox.Show("Interview date must be at least tomorrow.", "Invalid Date", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -305,14 +303,16 @@ namespace projects.HRStaff
         {
             this.Controls.Add(new Label { Text = "EXISTING SCHEDULES", Font = new Font("Segoe UI", 8f, FontStyle.Bold), ForeColor = Color.FromArgb(70, 100, 85), Left = 28, Top = startTop, AutoSize = true, BackColor = Color.Transparent });
 
+            // ✅ UPDATED QUERY: Exclude Accepted/Rejected applicants
             DataTable schedules = db.Query(
                 @"SELECT is2.id, CONCAT(ap.first_name,' ',ap.last_name) AS name,
                          jv.title AS job, is2.interview_type, is2.scheduled_date,
-                         is2.scheduled_time, is2.mode, is2.location, is2.interviewer, is2.status
+                         is2.scheduled_time, is2.mode, is2.location, is2.interviewer, is2.status, a.status AS app_status
                   FROM interview_schedules is2
                   JOIN applications a   ON a.id  = is2.application_id
                   JOIN applicants ap    ON ap.id  = a.applicant_id
                   JOIN job_vacancies jv ON jv.id  = a.job_vacancy_id
+                  WHERE a.status NOT IN ('Accepted', 'Rejected', 'Withdrawn', 'On Hold')
                   ORDER BY is2.scheduled_date DESC LIMIT 20");
 
             int rowTop = startTop + 22;
