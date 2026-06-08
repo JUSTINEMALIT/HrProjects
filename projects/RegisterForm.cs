@@ -65,11 +65,11 @@ namespace ApplicantPortal
 
             // FIRST NAME
             Label fnLbl = CreateLabel("First name", 15, 15);
-            TextBox txtFirst = CreateBox("", 15, 35);
+            TextBox txtFirst = CreateBox("Juan", 15, 35);
 
             // LAST NAME
             Label lnLbl = CreateLabel("Last name", 250, 15);
-            TextBox txtLast = CreateBox("", 250, 35);
+            TextBox txtLast = CreateBox("Dela Cruz", 250, 35);
 
             // EMAIL
             Label emailLbl = CreateLabel("Email address", 15, 75);
@@ -78,21 +78,21 @@ namespace ApplicantPortal
             txtEmail.Location = new Point(15, 95);
             txtEmail.BackColor = Color.FromArgb(45, 45, 45);
             txtEmail.ForeColor = Color.White;
-            txtEmail.Text = "";
+            txtEmail.Text = "juan@email.com";
 
             // PASSWORD
             Label passLbl = CreateLabel("Password", 15, 135);
-            TextBox txtPass = CreateBox("", 15, 155);
+            TextBox txtPass = CreateBox("Min. 8 characters", 15, 155);
             txtPass.UseSystemPasswordChar = true;
 
             // CONFIRM PASSWORD
             Label confirmLbl = CreateLabel("Confirm password", 250, 135);
-            TextBox txtConfirm = CreateBox("", 250, 155);
+            TextBox txtConfirm = CreateBox("Re-enter password", 250, 155);
             txtConfirm.UseSystemPasswordChar = true;
 
             // MOBILE
             Label mobileLbl = CreateLabel("Mobile number", 15, 195);
-            TextBox txtMobile = CreateBox("", 15, 215);
+            TextBox txtMobile = CreateBox("+63 9xx xxx xxxx", 15, 215);
 
             // DATE OF BIRTH
             Label dobLbl = CreateLabel("Date of birth", 250, 195);

@@ -239,23 +239,5 @@ namespace project
             path.CloseAllFigures();
             control.Region = new Region(path);
         }
-
-        private void InitializeComponent()
-        {
-            SuspendLayout();
-            // 
-            // ApplicantStatusTrackingPage
-            // 
-            ClientSize = new Size(284, 261);
-            Name = "ApplicantDashboardPage";
-            Load += ApplicantDashboardPage_Load;
-            ResumeLayout(false);
-
-        }
-
-        private void ApplicantDashboardPage_Load(object sender, EventArgs e)
-        {
-
-        }
     }
 }
