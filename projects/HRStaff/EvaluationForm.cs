@@ -72,6 +72,7 @@ namespace projects.HRStaff
                 listPanel.Controls.Clear();
                 bool pendingOnly = cmbFilter.SelectedIndex == 0;
 
+                // ✅ UPDATED QUERY: Exclude Accepted/Rejected applicants
                 DataTable dt = db.Query(
                     @"SELECT is2.id AS sched_id,
                              CONCAT(ap.first_name,' ',ap.last_name) AS name,
@@ -85,6 +86,7 @@ namespace projects.HRStaff
                       JOIN job_vacancies jv  ON jv.id = a.job_vacancy_id
                       LEFT JOIN interview_evaluations ie ON ie.interview_id = is2.id
                       WHERE is2.status = 'Completed'
+                        AND a.status NOT IN ('Accepted', 'Rejected', 'Withdrawn', 'On Hold', 'For Final Review')
                         AND (@pending=0 OR ie.id IS NULL)
                       ORDER BY is2.scheduled_date DESC",
                     ("@pending", pendingOnly ? 1 : 0));

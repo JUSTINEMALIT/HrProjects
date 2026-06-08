@@ -28,8 +28,6 @@ namespace projects.HRStaff
             this.BackColor = Color.FromArgb(18, 22, 28);
             this.AutoScroll = true;
 
-            this.Controls.Add(new Label { Text = "Applicant Review", Font = new Font("Segoe UI", 15f, FontStyle.Bold), ForeColor = Color.FromArgb(220, 235, 228), Left = 28, Top = 20, AutoSize = true, BackColor = Color.Transparent });
-
             if (appId == 0)
             {
                 this.Controls.Add(new Label { Text = "Select an applicant from the Applicant List to review.", Font = new Font("Segoe UI", 10f), ForeColor = Color.FromArgb(130, 150, 140), Left = 28, Top = 60, AutoSize = true, BackColor = Color.Transparent });
@@ -38,7 +36,6 @@ namespace projects.HRStaff
 
             var db = new DatabaseConnection();
 
-            // Load application + applicant + profile data
             DataTable appDt = db.Query(
                 @"SELECT a.id, a.status, a.expected_salary, a.preferred_start_date,
                          a.employment_type_pref, a.referral_source, a.cover_letter, a.submitted_at,
@@ -57,47 +54,21 @@ namespace projects.HRStaff
                   WHERE a.id = @id",
                 ("@id", appId));
 
-            if (appDt.Rows.Count == 0) { this.Controls.Add(new Label { Text = "Application not found.", ForeColor = Color.Red, Left = 28, Top = 60, AutoSize = true }); return; }
+            if (appDt.Rows.Count == 0) { this.Controls.Add(new Label { Text = "Application not found.", ForeColor = Color.Red, Left = 28, Top = 30, AutoSize = true }); return; }
 
             DataRow app = appDt.Rows[0];
             string status = app["status"].ToString();
-            bool isLocked = status != "Submitted";
 
             string S(string col) => app[col] == DBNull.Value ? "—" : app[col].ToString();
 
-            // Sub label
-            this.Controls.Add(new Label { Text = "APP-" + appId.ToString("D4") + "   |   Status: " + status, Font = new Font("Segoe UI", 9f), ForeColor = Color.FromArgb(100, 130, 115), Left = 29, Top = 48, AutoSize = true, BackColor = Color.Transparent });
+            this.Controls.Add(new Label { Text = "APP-" + appId.ToString("D4") + "   |   Status: " + status, Font = new Font("Segoe UI", 9f), ForeColor = Color.FromArgb(100, 130, 115), Left = 29, Top = 55, AutoSize = true, BackColor = Color.Transparent });
 
             // ── Action buttons ───────────────────────────────────────
             Panel actionBar = new Panel { Left = 28, Top = 68, Width = this.Width - 56, Height = 44, BackColor = Color.Transparent, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
 
-            if (status == "Submitted")
-            {
-                Button btnReview = ABtn("Start Review", Color.FromArgb(28, 80, 52), 0);
-                btnReview.Click += (s, e) => ChangeStatus(appId, "Under Review", "HR started reviewing the application.", db);
-                actionBar.Controls.Add(btnReview);
-            }
-            if (status == "Under Review")
-            {
-                Button btnShortlist = ABtn("Shortlist", Color.FromArgb(25, 80, 70), 0);
-                btnShortlist.Click += (s, e) => ChangeStatus(appId, "Shortlisted", "Applicant has been shortlisted.", db);
-                Button btnReject = ABtn("Reject", Color.FromArgb(80, 28, 28), 120);
-                btnReject.ForeColor = Color.FromArgb(255, 180, 180);
-                btnReject.Click += (s, e) => ChangeStatus(appId, "Rejected", "Applicant did not pass initial review.", db);
-                actionBar.Controls.Add(btnShortlist);
-                actionBar.Controls.Add(btnReject);
-            }
-            if (status == "Shortlisted")
-            {
-                Button btnForInterview = ABtn("For Interview", Color.FromArgb(50, 30, 90), 0);
-                btnForInterview.Click += (s, e) => ChangeStatus(appId, "For Interview", "Applicant scheduled for interview.", db);
-                actionBar.Controls.Add(btnForInterview);
-            }
-
-            // Business rule: HR Staff cannot accept — show disabled Accept for reference
-            bool isManager = project.Session.AdminRole == "Admin" || project.Session.AdminRole == "HR Manager";
             if (status == "For Final Review")
             {
+                bool isManager = project.Session.AdminRole == "Admin" || project.Session.AdminRole == "HR Manager";
                 if (isManager)
                 {
                     Button btnAccept = ABtn("Accept", Color.FromArgb(20, 80, 45), 0);
@@ -111,17 +82,79 @@ namespace projects.HRStaff
                 }
                 else
                 {
-                    // Business rule: HR Staff cannot accept
-                    Label lblNoAccept = new Label { Text = "⚠  Only HR Manager/Admin can make the final hiring decision.", Font = new Font("Segoe UI", 8.5f), ForeColor = Color.FromArgb(220, 160, 60), Left = 0, Top = 10, AutoSize = true, BackColor = Color.Transparent };
-                    actionBar.Controls.Add(lblNoAccept);
+                    actionBar.Controls.Add(new Label { Text = "⚠  Only HR Manager/Admin can make the final hiring decision.", Font = new Font("Segoe UI", 8.5f), ForeColor = Color.FromArgb(220, 160, 60), Left = 0, Top = 10, AutoSize = true, BackColor = Color.Transparent });
                 }
             }
 
             this.Controls.Add(actionBar);
 
+            // ── Info Banner (status-based guidance) ──────────────────
             int top = 122;
 
-            // ── Applicant Info ───────────────────────────────────────
+            string bannerText = null;
+            Color bannerBg = Color.Transparent;
+            Color bannerBorder = Color.Transparent;
+            Color bannerFore = Color.White;
+
+            if (status == "Submitted")
+            {
+                // Show Start Review button in actionBar
+                Button btnReview = ABtn("Start Review", Color.FromArgb(28, 80, 52), 0);
+                btnReview.Click += (s, e) => ChangeStatus(appId, "Under Review", "HR started reviewing the application.", db);
+                actionBar.Controls.Add(btnReview);
+
+                bannerText = "ℹ  Click \"Start Review\" then go to Screening to mark as Qualified or Not Qualified.";
+                bannerBg = Color.FromArgb(22, 36, 28);
+                bannerBorder = Color.FromArgb(40, 100, 65);
+                bannerFore = Color.FromArgb(100, 200, 140);
+            }
+            else if (status == "Under Review")
+            {
+                bannerText = "⚠  Go to Screening page to mark this applicant as Qualified or Not Qualified.";
+                bannerBg = Color.FromArgb(36, 32, 22);
+                bannerBorder = Color.FromArgb(100, 80, 40);
+                bannerFore = Color.FromArgb(220, 160, 60);
+            }
+            else if (status == "Shortlisted")
+            {
+                bannerText = "ℹ  Go to Interview Schedule page to schedule this applicant's interview.";
+                bannerBg = Color.FromArgb(22, 30, 40);
+                bannerBorder = Color.FromArgb(40, 80, 130);
+                bannerFore = Color.FromArgb(100, 160, 230);
+            }
+
+            if (bannerText != null)
+            {
+                Panel infoBanner = new Panel
+                {
+                    Left = 28,
+                    Top = top,
+                    Width = this.Width - 56,
+                    Height = 46,
+                    BackColor = bannerBg,
+                    Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                };
+                Color borderColor = bannerBorder;
+                infoBanner.Paint += (s, e) =>
+                {
+                    Pen p = new Pen(borderColor, 1);
+                    e.Graphics.DrawRectangle(p, 0, 0, infoBanner.Width - 1, infoBanner.Height - 1);
+                    p.Dispose();
+                };
+                infoBanner.Controls.Add(new Label
+                {
+                    Text = bannerText,
+                    Font = new Font("Segoe UI", 8.5f),
+                    ForeColor = bannerFore,
+                    Left = 14,
+                    Top = 13,
+                    AutoSize = true,
+                    BackColor = Color.Transparent
+                });
+                this.Controls.Add(infoBanner);
+                top += 58;
+            }
+
             top = InfoSection("Applicant Information", top, new[]
             {
                 ("Full Name",    S("full_name")),
@@ -133,7 +166,6 @@ namespace projects.HRStaff
                 ("Nationality",  S("nationality")),
             });
 
-            // ── Address ──────────────────────────────────────────────
             top = InfoSection("Address", top, new[]
             {
                 ("Province",  S("province")),
@@ -143,7 +175,6 @@ namespace projects.HRStaff
                 ("Zip Code",  S("zip_code")),
             });
 
-            // ── Education ────────────────────────────────────────────
             top = InfoSection("Educational Background", top, new[]
             {
                 ("Highest Degree", S("highest_degree")),
@@ -153,7 +184,6 @@ namespace projects.HRStaff
                 ("Skills",         S("skills")),
             });
 
-            // ── Work ─────────────────────────────────────────────────
             top = InfoSection("Work Experience", top, new[]
             {
                 ("Company",   S("work_company")),
@@ -161,7 +191,6 @@ namespace projects.HRStaff
                 ("Duration",  S("work_duration")),
             });
 
-            // ── Job Applied ──────────────────────────────────────────
             top = InfoSection("Job Applied For", top, new[]
             {
                 ("Position",    S("job")),
@@ -173,7 +202,6 @@ namespace projects.HRStaff
                 ("Source",      S("referral_source")),
             });
 
-            // ── Cover letter ─────────────────────────────────────────
             this.Controls.Add(new Label { Text = "COVER LETTER", Font = new Font("Segoe UI", 8f, FontStyle.Bold), ForeColor = Color.FromArgb(70, 100, 85), Left = 28, Top = top, AutoSize = true, BackColor = Color.Transparent });
             Panel coverCard = new Panel { Left = 28, Top = top + 20, Width = this.Width - 56, Height = 80, BackColor = Color.FromArgb(22, 28, 24), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
             coverCard.Paint += (s, e) => { Pen pen = new Pen(Color.FromArgb(35, 50, 42), 1); e.Graphics.DrawRectangle(pen, 0, 0, coverCard.Width - 1, coverCard.Height - 1); pen.Dispose(); };
@@ -181,11 +209,9 @@ namespace projects.HRStaff
             this.Controls.Add(coverCard);
             top += 110;
 
-            // ── Documents ───────────────────────────────────────────
             this.Controls.Add(new Label { Text = "SUBMITTED DOCUMENTS", Font = new Font("Segoe UI", 8f, FontStyle.Bold), ForeColor = Color.FromArgb(70, 100, 85), Left = 28, Top = top, AutoSize = true, BackColor = Color.Transparent });
             top += 22;
 
-            // Doc table header
             Panel dHdr = new Panel { Left = 28, Top = top, Width = this.Width - 56, Height = 26, BackColor = Color.FromArgb(26, 34, 28), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
             dHdr.Controls.Add(DH("DOCUMENT", 12, 190));
             dHdr.Controls.Add(DH("STATUS", 210, 90));
@@ -205,37 +231,23 @@ namespace projects.HRStaff
 
             foreach (DataRow doc in docs.Rows)
             {
-                Panel dr = DocRow(
-                    Convert.ToInt32(doc["id"]),
-                    doc["doc_name"].ToString(), doc["status"].ToString(),
-                    doc["file_name"] == DBNull.Value ? "—" : doc["file_name"].ToString(),
-                    doc["hr_remarks"] == DBNull.Value ? "" : doc["hr_remarks"].ToString(),
-                    this.Width - 56, db, appId);
+                Panel dr = DocRow(Convert.ToInt32(doc["id"]), doc["doc_name"].ToString(), doc["status"].ToString(), doc["file_name"] == DBNull.Value ? "—" : doc["file_name"].ToString(), doc["hr_remarks"] == DBNull.Value ? "" : doc["hr_remarks"].ToString(), this.Width - 56, db, appId);
                 dr.Left = 28; dr.Top = top;
                 dr.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
                 this.Controls.Add(dr);
                 top += dr.Height + 2;
             }
 
-            // ── Status History ───────────────────────────────────────
             this.Controls.Add(new Label { Text = "STATUS HISTORY", Font = new Font("Segoe UI", 8f, FontStyle.Bold), ForeColor = Color.FromArgb(70, 100, 85), Left = 28, Top = top + 12, AutoSize = true, BackColor = Color.Transparent });
             top += 34;
 
-            DataTable hist = db.Query(
-                "SELECT status, remarks, changed_by, changed_at FROM application_status_history WHERE application_id=@id ORDER BY changed_at DESC",
-                ("@id", appId));
+            DataTable hist = db.Query("SELECT status, remarks, changed_by, changed_at FROM application_status_history WHERE application_id=@id ORDER BY changed_at DESC", ("@id", appId));
 
             foreach (DataRow row in hist.Rows)
             {
                 Color sc = StatusColor(row["status"].ToString());
                 Panel hr2 = new Panel { Left = 28, Top = top, Width = this.Width - 56, Height = 46, BackColor = Color.FromArgb(22, 28, 24), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-                hr2.Paint += (s, e) =>
-                {
-                    Pen p = new Pen(Color.FromArgb(35, 50, 42), 1);
-                    e.Graphics.DrawLine(p, 0, hr2.Height - 1, hr2.Width, hr2.Height - 1); p.Dispose();
-                    e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                    SolidBrush b = new SolidBrush(sc); e.Graphics.FillEllipse(b, 12, 18, 10, 10); b.Dispose();
-                };
+                hr2.Paint += (s, e) => { Pen p = new Pen(Color.FromArgb(35, 50, 42), 1); e.Graphics.DrawLine(p, 0, hr2.Height - 1, hr2.Width, hr2.Height - 1); p.Dispose(); e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; SolidBrush b = new SolidBrush(sc); e.Graphics.FillEllipse(b, 12, 18, 10, 10); b.Dispose(); };
                 hr2.Controls.Add(new Label { Text = row["status"].ToString(), Font = new Font("Segoe UI", 9f, FontStyle.Bold), ForeColor = sc, Left = 34, Top = 6, AutoSize = true, BackColor = Color.Transparent });
                 hr2.Controls.Add(new Label { Text = row["remarks"] == DBNull.Value ? "" : row["remarks"].ToString(), Font = new Font("Segoe UI", 8.5f), ForeColor = Color.FromArgb(160, 180, 170), Left = 34, Top = 26, Width = this.Width - 220, AutoSize = false, BackColor = Color.Transparent });
                 hr2.Controls.Add(new Label { Text = Convert.ToDateTime(row["changed_at"]).ToString("MMM dd, yyyy h:mm tt") + " — " + row["changed_by"], Font = new Font("Segoe UI", 7.5f), ForeColor = Color.FromArgb(90, 110, 100), Width = 260, TextAlign = ContentAlignment.TopRight, Left = this.Width - 310, Top = 8, BackColor = Color.Transparent });
@@ -251,9 +263,7 @@ namespace projects.HRStaff
             try
             {
                 db.Execute("UPDATE applications SET status=@st WHERE id=@id", ("@st", newStatus), ("@id", appId));
-                db.Execute(
-                    "INSERT INTO application_status_history (application_id, status, remarks, changed_by) VALUES (@id,@st,@rm,@who)",
-                    ("@id", appId), ("@st", newStatus), ("@rm", remarks), ("@who", project.Session.AdminUsername));
+                db.Execute("INSERT INTO application_status_history (application_id, status, remarks, changed_by) VALUES (@id,@st,@rm,@who)", ("@id", appId), ("@st", newStatus), ("@rm", remarks), ("@who", project.Session.AdminUsername));
                 Audit.Log("Changed status to " + newStatus, "applications", appId);
                 MessageBox.Show("Status updated to: " + newStatus, "Updated", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 Reload(appId);
@@ -263,7 +273,6 @@ namespace projects.HRStaff
 
         private void FinalDecision(int appId, string decision, DatabaseConnection db)
         {
-            // Business rule: only HR Manager/Admin can accept
             if (decision == "Accepted" && project.Session.AdminRole == "HR Staff")
             {
                 MessageBox.Show("Only HR Manager or Admin can accept applicants.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -290,17 +299,12 @@ namespace projects.HRStaff
                     {
                         string newStatus = decision == "Accepted" ? "Accepted" : decision == "Rejected" ? "Rejected" : "For Final Review";
                         db.Execute("UPDATE applications SET status=@st WHERE id=@id", ("@st", newStatus), ("@id", appId));
-                        // Upsert hiring_decisions
                         object exists = db.Scalar("SELECT COUNT(*) FROM hiring_decisions WHERE application_id=@id", ("@id", appId));
                         if (Convert.ToInt32(exists) > 0)
-                            db.Execute("UPDATE hiring_decisions SET decision=@d, remarks=@r, decided_by=@by, decided_at=NOW() WHERE application_id=@id",
-                                ("@d", decision), ("@r", txtR.Text.Trim()), ("@by", project.Session.AdminUsername), ("@id", appId));
+                            db.Execute("UPDATE hiring_decisions SET decision=@d, remarks=@r, decided_by=@by, decided_at=NOW() WHERE application_id=@id", ("@d", decision), ("@r", txtR.Text.Trim()), ("@by", project.Session.AdminUsername), ("@id", appId));
                         else
-                            db.Execute("INSERT INTO hiring_decisions (application_id, decision, remarks, decided_by) VALUES (@id,@d,@r,@by)",
-                                ("@id", appId), ("@d", decision), ("@r", txtR.Text.Trim()), ("@by", project.Session.AdminUsername));
-                        db.Execute(
-                            "INSERT INTO application_status_history (application_id, status, remarks, changed_by) VALUES (@id,@st,@rm,@who)",
-                            ("@id", appId), ("@st", newStatus), ("@rm", "Final decision: " + decision + ". " + txtR.Text.Trim()), ("@who", project.Session.AdminUsername));
+                            db.Execute("INSERT INTO hiring_decisions (application_id, decision, remarks, decided_by) VALUES (@id,@d,@r,@by)", ("@id", appId), ("@d", decision), ("@r", txtR.Text.Trim()), ("@by", project.Session.AdminUsername));
+                        db.Execute("INSERT INTO application_status_history (application_id, status, remarks, changed_by) VALUES (@id,@st,@rm,@who)", ("@id", appId), ("@st", newStatus), ("@rm", "Final decision: " + decision + ". " + txtR.Text.Trim()), ("@who", project.Session.AdminUsername));
                         Audit.Log("Final decision: " + decision, "hiring_decisions", appId);
                         MessageBox.Show("Decision saved: " + decision, "Done", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         popup.Close();
@@ -341,123 +345,27 @@ namespace projects.HRStaff
 
         private Panel DocRow(int docId, string name, string status, string fileName, string remarks, int width, DatabaseConnection db, int appId)
         {
-            // Get file_path from DB
             string filePath = "";
-            try
-            {
-                object fp = db.Scalar("SELECT file_path FROM applicant_documents WHERE id=@id", ("@id", docId));
-                if (fp != null && fp != DBNull.Value) filePath = fp.ToString();
-            }
+            try { object fp = db.Scalar("SELECT file_path FROM applicant_documents WHERE id=@id", ("@id", docId)); if (fp != null && fp != DBNull.Value) filePath = fp.ToString(); }
             catch { }
-
             bool hasFile = !string.IsNullOrEmpty(filePath) && System.IO.File.Exists(filePath);
-
-            Color sc = status == "Submitted" || status == "Validated"
-                ? Color.FromArgb(60, 180, 100)
-                : status == "Missing"
-                    ? Color.FromArgb(220, 80, 80)
-                    : Color.FromArgb(120, 120, 120);
-
+            Color sc = status == "Submitted" || status == "Validated" ? Color.FromArgb(60, 180, 100) : status == "Missing" ? Color.FromArgb(220, 80, 80) : Color.FromArgb(120, 120, 120);
             Panel row = new Panel { Width = width, Height = 50, BackColor = Color.FromArgb(22, 28, 24) };
-            row.Paint += (s, e) =>
-            {
-                Pen p = new Pen(Color.FromArgb(35, 50, 42), 1);
-                e.Graphics.DrawLine(p, 0, row.Height - 1, row.Width, row.Height - 1); p.Dispose();
-            };
-
-            // Document name
+            row.Paint += (s, e) => { Pen p = new Pen(Color.FromArgb(35, 50, 42), 1); e.Graphics.DrawLine(p, 0, row.Height - 1, row.Width, row.Height - 1); p.Dispose(); };
             row.Controls.Add(new Label { Text = name, Font = new Font("Segoe UI", 9f, FontStyle.Bold), ForeColor = Color.FromArgb(200, 218, 208), Left = 12, Top = 15, Width = 190, BackColor = Color.Transparent });
-
-            // Status badge
             row.Controls.Add(new Label { Text = status.ToUpper(), Font = new Font("Segoe UI", 7.5f, FontStyle.Bold), ForeColor = sc, BackColor = Color.FromArgb(24, 28, 26), Width = 86, Height = 20, TextAlign = ContentAlignment.MiddleCenter, Left = 210, Top = 15 });
-
-            // File name
-            row.Controls.Add(new Label
-            {
-                Text = fileName == "—" ? "No file uploaded" : fileName,
-                Font = new Font("Segoe UI", 8f),
-                ForeColor = hasFile ? Color.FromArgb(110, 160, 200) : Color.FromArgb(130, 100, 100),
-                Left = 306,
-                Top = 15,
-                Width = 160,
-                BackColor = Color.Transparent
-            });
-
-            // HR Remarks
+            row.Controls.Add(new Label { Text = fileName == "—" ? "No file uploaded" : fileName, Font = new Font("Segoe UI", 8f), ForeColor = hasFile ? Color.FromArgb(110, 160, 200) : Color.FromArgb(130, 100, 100), Left = 306, Top = 15, Width = 160, BackColor = Color.Transparent });
             TextBox txtR = new TextBox { Text = remarks, Left = 474, Top = 14, Width = 160, Height = 22, BackColor = Color.FromArgb(26, 34, 28), ForeColor = Color.FromArgb(190, 210, 200), BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 8.5f) };
             row.Controls.Add(txtR);
-
-            // View File button — only if has file
-            Button btnView = new Button
-            {
-                Text = "View File",
-                Left = 644,
-                Top = 13,
-                Width = 76,
-                Height = 26,
-                BackColor = hasFile ? Color.FromArgb(25, 55, 80) : Color.FromArgb(35, 35, 35),
-                ForeColor = hasFile ? Color.White : Color.FromArgb(100, 100, 100),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8.5f),
-                Cursor = hasFile ? Cursors.Hand : Cursors.Default,
-                Enabled = hasFile
-            };
+            Button btnView = new Button { Text = "View File", Left = 644, Top = 13, Width = 76, Height = 26, BackColor = hasFile ? Color.FromArgb(25, 55, 80) : Color.FromArgb(35, 35, 35), ForeColor = hasFile ? Color.White : Color.FromArgb(100, 100, 100), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5f), Cursor = hasFile ? Cursors.Hand : Cursors.Default, Enabled = hasFile };
             btnView.FlatAppearance.BorderSize = 0;
             string capturedPath = filePath;
-            btnView.Click += (s, e) =>
-            {
-                try
-                {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = capturedPath,
-                        UseShellExecute = true
-                    });
-                }
-                catch (Exception ex) { MessageBox.Show("Cannot open file:\n" + ex.Message); }
-            };
+            btnView.Click += (s, e) => { try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = capturedPath, UseShellExecute = true }); } catch (Exception ex) { MessageBox.Show("Cannot open file:\n" + ex.Message); } };
             row.Controls.Add(btnView);
-
-            // Validate button
-            Button btnVal = new Button
-            {
-                Text = status == "Validated" ? "✔ Validated" : "Validate",
-                Left = 728,
-                Top = 13,
-                Width = 86,
-                Height = 26,
-                BackColor = status == "Validated" ? Color.FromArgb(20, 50, 30) : Color.FromArgb(25, 70, 50),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8.5f),
-                Cursor = Cursors.Hand,
-                Enabled = status != "Validated"
-            };
+            Button btnVal = new Button { Text = status == "Validated" ? "✔ Validated" : "Validate", Left = 728, Top = 13, Width = 86, Height = 26, BackColor = status == "Validated" ? Color.FromArgb(20, 50, 30) : Color.FromArgb(25, 70, 50), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5f), Cursor = Cursors.Hand, Enabled = status != "Validated" };
             btnVal.FlatAppearance.BorderSize = 0;
             int capturedDocId = docId;
-            btnVal.Click += (s, e) =>
-            {
-                // Business rule: must have file before validating
-                if (!hasFile)
-                {
-                    MessageBox.Show("Cannot validate — applicant has not uploaded this document yet.", "No File", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                var confirm = MessageBox.Show("Validate this document?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (confirm != DialogResult.Yes) return;
-
-                try
-                {
-                    db.Execute(
-                        "UPDATE applicant_documents SET status='Validated', hr_remarks=@rm WHERE id=@id",
-                        ("@rm", txtR.Text.Trim()), ("@id", capturedDocId));
-                    Audit.Log("Validated document", "applicant_documents", capturedDocId);
-                    MessageBox.Show("Document validated successfully.", "Validated", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    Reload(appId);
-                }
-                catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
-            };
+            btnVal.Click += (s, e) => { if (!hasFile) { MessageBox.Show("Cannot validate — applicant has not uploaded this document yet.", "No File", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; } var confirm = MessageBox.Show("Validate this document?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question); if (confirm != DialogResult.Yes) return; try { db.Execute("UPDATE applicant_documents SET status='Validated', hr_remarks=@rm WHERE id=@id", ("@rm", txtR.Text.Trim()), ("@id", capturedDocId)); Audit.Log("Validated document", "applicant_documents", capturedDocId); MessageBox.Show("Document validated successfully.", "Validated", MessageBoxButtons.OK, MessageBoxIcon.Information); Reload(appId); } catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); } };
             row.Controls.Add(btnVal);
             return row;
         }
