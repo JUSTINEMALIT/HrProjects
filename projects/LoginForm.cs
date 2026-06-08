@@ -7,6 +7,9 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
+
+//loginform
+
 namespace ApplicantPortal
 {
     public partial class LoginForm : Form
@@ -79,7 +82,6 @@ namespace ApplicantPortal
             txtEmail.BackColor = Color.FromArgb(45, 45, 45);
             txtEmail.ForeColor = Color.White;
             txtEmail.BorderStyle = BorderStyle.FixedSingle;
-            txtEmail.Text = "juan.delacruz@email.com";
 
             // PASSWORD LABEL
             Label passLbl = new Label();
@@ -97,7 +99,6 @@ namespace ApplicantPortal
             txtPass.ForeColor = Color.White;
             txtPass.BorderStyle = BorderStyle.FixedSingle;
             txtPass.UseSystemPasswordChar = true;
-            txtPass.Text = "password";
 
             // LOGIN BUTTON
             Button btnLogin = new Button();
