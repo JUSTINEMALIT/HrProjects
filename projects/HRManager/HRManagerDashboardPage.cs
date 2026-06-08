@@ -4,6 +4,9 @@ using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
 
+
+//hr manager/admin managerdashboard
+
 namespace projects.HRManager
 {
     public partial class HRManagerDashboardPage : Form
@@ -254,9 +257,6 @@ namespace projects.HRManager
         private void InitializeComponent()
         {
             SuspendLayout();
-            // 
-            // ApplicantListForm
-            // 
             ClientSize = new Size(284, 261);
             Name = "HRManagerDashboardPage";
             Load += HRManagerDashboardPage_Load;

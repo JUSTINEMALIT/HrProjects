@@ -5,6 +5,9 @@ using System.Drawing;
 using System.Windows.Forms;
 
 namespace projects.HRManager
+
+
+//hr manager/admin managejobvacancy
 {
     public partial class HRManagerJobVacancyPage : Form
     {

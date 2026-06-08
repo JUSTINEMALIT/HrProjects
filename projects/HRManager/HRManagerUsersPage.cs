@@ -4,6 +4,9 @@ using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
 
+
+//hr manager/admin manageusers
+
 namespace projects.HRManager
 {
     public partial class HRManagerUsersPage : Form

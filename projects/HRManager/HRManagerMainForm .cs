@@ -3,6 +3,10 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 
+
+
+//hr manager/admin mainform
+
 namespace projects.HRManager
 {
     public partial class HRManagerMainForm : Form

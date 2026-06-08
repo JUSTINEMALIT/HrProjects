@@ -7,6 +7,9 @@ using System.IO;
 using System.Text;
 using System.Windows.Forms;
 
+
+//hr manager/admin reportpage
+
 namespace projects.HRManager
 {
     public partial class HRManagerReportsPage : Form

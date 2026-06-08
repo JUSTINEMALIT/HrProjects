@@ -4,6 +4,9 @@ using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
 
+
+//hr manager/admin screening
+
 namespace projects.HRManager
 {
     public partial class HRManagerScreeningPage : Form
@@ -136,9 +139,6 @@ namespace projects.HRManager
         private void InitializeComponent()
         {
             SuspendLayout();
-            // 
-            // ApplicantStatusTrackingPage
-            // 
             ClientSize = new Size(284, 261);
             Name = "HRManagerScreeningPage";
             Load += HRManagerScreeningPage_Load;

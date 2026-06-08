@@ -219,5 +219,21 @@ namespace ApplicantPortal
             this.Controls.Add(subtitle);
             this.Controls.Add(card);
         }
+
+
+        private void InitializeComponent()
+        {
+            SuspendLayout();
+            ClientSize = new Size(284, 261);
+            Name = "RegisterForm ";
+            Load += RegisterForm_Load;
+            ResumeLayout(false);
+
+        }
+
+        private void RegisterForm_Load(object sender, EventArgs e)
+        {
+
+        }
     }
 }
