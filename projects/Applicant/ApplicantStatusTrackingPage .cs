@@ -6,8 +6,11 @@ using System.Windows.Forms;
 
 namespace HRApplicant
 {
-    public static class ApplicantStatusTrackingPage
+    public class ApplicantStatusTrackingPage : Form
     {
+        private ApplicantMainForm mainForm;
+        private Panel contentPanel;
+
         private static readonly string[] AllStatuses =
         {
             "Draft","Submitted","Under Review","Shortlisted",
@@ -26,15 +29,21 @@ namespace HRApplicant
             Color.FromArgb(60, 200, 100)
         };
 
-        public static void Show(ApplicantMainForm main)
+        public ApplicantStatusTrackingPage(ApplicantMainForm main)
         {
-            main.ClearContent();
-            var p = main.contentPanel;
+            this.mainForm = main;
+            this.contentPanel = main.contentPanel;
+            InitializePage();
+        }
+
+        private void InitializePage()
+        {
+            mainForm.ClearContent();
+            var p = contentPanel;
             var db = new DatabaseConnection();
 
             p.Controls.Add(new Label { Text = "Application Status", Font = new Font("Segoe UI", 15f, FontStyle.Bold), ForeColor = Color.FromArgb(220, 235, 228), Left = 28, Top = 18, AutoSize = true, BackColor = Color.Transparent });
 
-            // Load ALL applications
             DataTable allApps = db.Query(
                 @"SELECT a.id, a.status, jv.title AS job_title, d.name AS department
                   FROM applications a
@@ -69,7 +78,6 @@ namespace HRApplicant
             cmbJobs.SelectedIndex = 0;
             p.Controls.Add(cmbJobs);
 
-            // Content panel
             Panel trackContent = new Panel
             {
                 Left = 0,
@@ -98,7 +106,7 @@ namespace HRApplicant
 
                 DataRow app = appDt.Rows[0];
                 string status = app["status"].ToString();
-                main.applicationStatus = status;
+                mainForm.applicationStatus = status;
 
                 int top = 10;
 
@@ -182,7 +190,7 @@ namespace HRApplicant
                             Pen pen = new Pen(Color.FromArgb(35, 50, 42), 1);
                             e.Graphics.DrawLine(pen, 0, tRow.Height - 1, tRow.Width, tRow.Height - 1); pen.Dispose();
                             e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                            SolidBrush b = new SolidBrush(sc); e.Graphics.FillEllipse(b, 12, 20, 10, 10); b.Dispose();
+                            SolidBrush bru = new SolidBrush(sc); e.Graphics.FillEllipse(bru, 12, 20, 10, 10); bru.Dispose();
                         };
                         tRow.Controls.Add(new Label { Text = row["status"].ToString(), Font = new Font("Segoe UI", 9f, FontStyle.Bold), ForeColor = sc, Left = 34, Top = 6, AutoSize = true, BackColor = Color.Transparent });
                         tRow.Controls.Add(new Label { Text = row["remarks"] == DBNull.Value ? "" : row["remarks"].ToString(), Font = new Font("Segoe UI", 8.5f), ForeColor = Color.FromArgb(160, 180, 170), Left = 34, Top = 28, Width = trackContent.Width - 220, AutoSize = false, BackColor = Color.Transparent });
@@ -240,11 +248,9 @@ namespace HRApplicant
                 }
             };
 
-            // Load first app
             int firstAppId = Convert.ToInt32(allApps.Rows[0]["id"]);
             loadTracking(firstAppId);
 
-            // Switch on dropdown change
             cmbJobs.SelectedIndexChanged += (s, e) =>
             {
                 if (cmbJobs.SelectedIndex < 0) return;
@@ -254,7 +260,7 @@ namespace HRApplicant
             };
         }
 
-        private static Color GetStatusColor(string status)
+        private Color GetStatusColor(string status)
         {
             if (status == "Draft") return Color.FromArgb(130, 130, 160);
             if (status == "Submitted") return Color.FromArgb(80, 160, 220);
@@ -267,6 +273,23 @@ namespace HRApplicant
             if (status == "Rejected") return Color.FromArgb(220, 80, 80);
             if (status == "Withdrawn") return Color.FromArgb(160, 100, 80);
             return Color.FromArgb(150, 150, 150);
+        }
+        private void InitializeComponent()
+        {
+            SuspendLayout();
+            // 
+            // ApplicantStatusTrackingPage
+            // 
+            ClientSize = new Size(284, 261);
+            Name = "ApplicantStatusTrackingPage";
+            Load += ApplicantStatusTrackingPage_Load;
+            ResumeLayout(false);
+
+        }
+
+        private void ApplicantStatusTrackingPage_Load(object sender, EventArgs e)
+        {
+
         }
     }
 }

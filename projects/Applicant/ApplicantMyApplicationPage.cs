@@ -6,12 +6,22 @@ using System.Windows.Forms;
 
 namespace HRApplicant
 {
-    public static class ApplicantMyApplicationPage
+    public partial class ApplicantMyApplicationPage : Form
     {
-        public static void Show(ApplicantMainForm main)
+        private ApplicantMainForm mainForm;
+        private Panel contentPanel;
+
+        public ApplicantMyApplicationPage(ApplicantMainForm main)
         {
-            main.ClearContent();
-            var p = main.contentPanel;
+            this.mainForm = main;
+            this.contentPanel = main.contentPanel;
+            InitializePage();
+        }
+
+        private void InitializePage()
+        {
+            mainForm.ClearContent();
+            var p = contentPanel;
             var db = new DatabaseConnection();
 
             p.Controls.Add(new Label { Text = "My Application", Font = new Font("Segoe UI", 15f, FontStyle.Bold), ForeColor = Color.FromArgb(220, 235, 228), Left = 28, Top = 18, AutoSize = true, BackColor = Color.Transparent });
@@ -81,7 +91,7 @@ namespace HRApplicant
                 DataRow app = appDt.Rows[0];
                 string status = app["status"].ToString();
                 bool isEditable = status == "Draft" || status == "Submitted";
-                main.applicationStatus = status;
+                mainForm.applicationStatus = status;
 
                 string SafeStr(object v) => v == DBNull.Value ? "" : v.ToString();
                 string SafeDate(object v) => v == DBNull.Value ? "" : Convert.ToDateTime(v).ToString("yyyy-MM-dd");
@@ -134,7 +144,7 @@ namespace HRApplicant
                 bool hasUnsavedChanges = false;
                 TextBox txtCover = null;
                 System.Windows.Forms.Timer autoSaveTimer = new System.Windows.Forms.Timer();
-                autoSaveTimer.Interval = 2000; // 2 seconds
+                autoSaveTimer.Interval = 2000;
                 autoSaveTimer.Tick += (s, e) =>
                 {
                     if (isEditable && hasUnsavedChanges)
@@ -170,7 +180,6 @@ namespace HRApplicant
                 txtCover.TextChanged += (s, e) => { hasUnsavedChanges = true; autoSaveTimer.Stop(); autoSaveTimer.Start(); };
                 card.Controls.Add(txtCover);
 
-                // Required note
                 card.Controls.Add(new Label { Text = "* Required fields", Font = new Font("Segoe UI", 7.5f, FontStyle.Italic), ForeColor = Color.FromArgb(220, 80, 80), Left = 14, Top = 258, AutoSize = true, BackColor = Color.Transparent });
 
                 appContent.Controls.Add(card);
@@ -215,45 +224,21 @@ namespace HRApplicant
 
                         DataRow prof = profile.Rows[0];
                         if (string.IsNullOrWhiteSpace(prof["province"].ToString()))
-                        {
-                            MessageBox.Show("Profile is missing: Province", "Incomplete Profile", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                            return;
-                        }
+                        { MessageBox.Show("Profile is missing: Province", "Incomplete Profile", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
                         if (string.IsNullOrWhiteSpace(prof["city"].ToString()))
-                        {
-                            MessageBox.Show("Profile is missing: City", "Incomplete Profile", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                            return;
-                        }
+                        { MessageBox.Show("Profile is missing: City", "Incomplete Profile", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
                         if (string.IsNullOrWhiteSpace(prof["street"].ToString()))
-                        {
-                            MessageBox.Show("Profile is missing: Street Address", "Incomplete Profile", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                            return;
-                        }
+                        { MessageBox.Show("Profile is missing: Street Address", "Incomplete Profile", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
                         if (string.IsNullOrWhiteSpace(prof["barangay"].ToString()))
-                        {
-                            MessageBox.Show("Profile is missing: Barangay", "Incomplete Profile", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                            return;
-                        }
+                        { MessageBox.Show("Profile is missing: Barangay", "Incomplete Profile", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
 
                         // ── Field validation ──────────────────────────
                         if (string.IsNullOrWhiteSpace(fTxt[0].Text))
-                        {
-                            MessageBox.Show("Expected Salary is required.", "Required Field", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                            fTxt[0].Focus();
-                            return;
-                        }
+                        { MessageBox.Show("Expected Salary is required.", "Required Field", MessageBoxButtons.OK, MessageBoxIcon.Warning); fTxt[0].Focus(); return; }
                         if (string.IsNullOrWhiteSpace(fTxt[1].Text))
-                        {
-                            MessageBox.Show("Preferred Start Date is required.", "Required Field", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                            fTxt[1].Focus();
-                            return;
-                        }
+                        { MessageBox.Show("Preferred Start Date is required.", "Required Field", MessageBoxButtons.OK, MessageBoxIcon.Warning); fTxt[1].Focus(); return; }
                         if (string.IsNullOrWhiteSpace(fTxt[2].Text))
-                        {
-                            MessageBox.Show("Employment Type Preferred is required.", "Required Field", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                            fTxt[2].Focus();
-                            return;
-                        }
+                        { MessageBox.Show("Employment Type Preferred is required.", "Required Field", MessageBoxButtons.OK, MessageBoxIcon.Warning); fTxt[2].Focus(); return; }
 
                         // ── Employment type match validation ──────────
                         object jobEmpType = db.Scalar(
@@ -262,7 +247,6 @@ namespace HRApplicant
 
                         if (jobEmpType != null && jobEmpType != DBNull.Value)
                         {
-                            // Normalize both strings — remove spaces, hyphens, convert to lowercase
                             string jobType = jobEmpType.ToString().Trim().ToLower().Replace(" ", "").Replace("-", "");
                             string prefType = fTxt[2].Text.Trim().ToLower().Replace(" ", "").Replace("-", "");
 
@@ -276,11 +260,7 @@ namespace HRApplicant
                             }
                         }
                         if (string.IsNullOrWhiteSpace(txtCover.Text))
-                        {
-                            MessageBox.Show("Cover Letter / Remarks is required.", "Required Field", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                            txtCover.Focus();
-                            return;
-                        }
+                        { MessageBox.Show("Cover Letter / Remarks is required.", "Required Field", MessageBoxButtons.OK, MessageBoxIcon.Warning); txtCover.Focus(); return; }
 
                         // ── CV check ──────────────────────────────────
                         object cvStatus = db.Scalar(
@@ -316,7 +296,7 @@ namespace HRApplicant
                                 ("@id", appId), ("@who", project.Session.ApplicantName));
                             Audit.Log("Submitted application", "applications", appId);
                             MessageBox.Show("Application submitted successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                            ApplicantMyApplicationPage.Show(main);
+                            new ApplicantMyApplicationPage(mainForm);
                         }
                         catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
                     };
@@ -335,7 +315,7 @@ namespace HRApplicant
                                 ("@id", appId), ("@who", project.Session.ApplicantName));
                             Audit.Log("Withdrew application", "applications", appId);
                             MessageBox.Show("Application withdrawn.", "Done", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                            ApplicantMyApplicationPage.Show(main);
+                            new ApplicantMyApplicationPage(mainForm);
                         }
                         catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
                     };
@@ -354,17 +334,34 @@ namespace HRApplicant
                 if (cmbJobs.SelectedIndex < 0) return;
                 string selected = cmbJobs.SelectedItem.ToString();
                 int selectedAppId = Convert.ToInt32(selected.Split('|')[1]);
-                // Auto-save delay before switching
                 System.Threading.Thread.Sleep(500);
                 loadApp(selectedAppId);
             };
         }
 
-        private static Button MakeBtn(string text, Color bg, int top, int left)
+        private Button MakeBtn(string text, Color bg, int top, int left)
         {
             Button btn = new Button { Text = text, Left = left, Top = top, Width = 110, Height = 34, BackColor = bg, ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9f, FontStyle.Bold), Cursor = Cursors.Hand };
             btn.FlatAppearance.BorderSize = 0;
             return btn;
+        }
+
+        private void InitializeComponent()
+        {
+            SuspendLayout();
+            // 
+            // ApplicantStatusTrackingPage
+            // 
+            ClientSize = new Size(284, 261);
+            Name = "ApplicantMyApplicationPage";
+            Load += ApplicantMyApplicationPage_Load;
+            ResumeLayout(false);
+
+        }
+
+        private void ApplicantMyApplicationPage_Load(object sender, EventArgs e)
+        {
+
         }
     }
 }

@@ -7,13 +7,15 @@ using System.Windows.Forms;
 
 namespace HRApplicant
 {
-    public static class ApplicantProfilePage
+    public class ApplicantProfilePage : Form
     {
+        private ApplicantMainForm mainForm;
+        private Panel contentPanel;
+
         // ── Design Tokens ─────────────────────────────────────────────
         private static readonly Color BgPage = Color.FromArgb(13, 15, 18);
         private static readonly Color BgCard = Color.FromArgb(20, 24, 28);
         private static readonly Color BgField = Color.FromArgb(16, 20, 24);
-        private static readonly Color BgFieldHover = Color.FromArgb(22, 27, 32);
         private static readonly Color BorderSubtle = Color.FromArgb(32, 40, 48);
         private static readonly Color BorderFocus = Color.FromArgb(56, 149, 255);
         private static readonly Color TextPrimary = Color.FromArgb(228, 234, 240);
@@ -22,20 +24,25 @@ namespace HRApplicant
         private static readonly Color AccentGreen = Color.FromArgb(52, 211, 153);
         private static readonly Color AccentBlue = Color.FromArgb(56, 149, 255);
 
-        public static void Show(ApplicantMainForm main)
+        public ApplicantProfilePage(ApplicantMainForm main)
+        {
+            this.mainForm = main;
+            this.contentPanel = main.contentPanel;
+            InitializePage();
+        }
+
+        private void InitializePage()
         {
             var db = new DatabaseConnection();
-            main.ClearContent();
-            var p = main.contentPanel;
+            mainForm.ClearContent();
+            var p = contentPanel;
             p.BackColor = BgPage;
 
-            // ── Enable smooth scrolling optimization ──────────────────
             SetDoubleBuffered(p, true);
             SetControlStyle(p, ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
             SetControlStyle(p, ControlStyles.Opaque, true);
             p.AutoScroll = true;
 
-            // Suspend layout para sa faster control addition
             p.SuspendLayout();
 
             // ── Load existing data ─────────────────────────────────────
@@ -54,11 +61,8 @@ namespace HRApplicant
             {
                 if (row == null || !row.Table.Columns.Contains(col)) return "";
                 if (row[col] == DBNull.Value) return "";
-
-                // Format date_of_birth as YYYY-MM-DD without time
                 if (col == "date_of_birth" && row[col] is DateTime dt)
                     return dt.ToString("yyyy-MM-dd");
-
                 return row[col].ToString();
             }
 
@@ -125,16 +129,11 @@ namespace HRApplicant
             avatar.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-
-                // card border
                 using (var pen = new Pen(BorderSubtle, 1))
                     DrawRoundedRect(e.Graphics, pen, 0, 0, avatar.Width - 1, avatar.Height - 1, 8);
-
-                // circle background
                 using (var br = new SolidBrush(Color.FromArgb(30, 52, 211, 153)))
                     e.Graphics.FillEllipse(br, 20, 16, 56, 56);
 
-                // initials — centred inside ellipse
                 string initials =
                     (project.Session.FirstName.Length > 0 ? project.Session.FirstName[0].ToString() : "") +
                     (project.Session.LastName.Length > 0 ? project.Session.LastName[0].ToString() : "");
@@ -148,7 +147,6 @@ namespace HRApplicant
                     e.Graphics.DrawString(initials, f, tb, ix, iy);
                 }
 
-                // thin accent line on left edge of card
                 using (var br = new SolidBrush(AccentGreen))
                     e.Graphics.FillRectangle(br, 0, 20, 3, 48);
             };
@@ -307,32 +305,29 @@ namespace HRApplicant
             };
             p.Controls.Add(btnSave);
 
-            // Resume layout after all controls added
             p.ResumeLayout(false);
             p.PerformLayout();
         }
 
         // ── Section card builder ───────────────────────────────────────
-        private static int AddSection(Panel p, string title, int top,
+        private int AddSection(Panel p, string title, int top,
             string[] labels, string[] values, out TextBox[] boxes)
         {
-            const int PADDING = 20;   // inner horizontal padding
-            const int GAP = 16;   // gap between two columns
-            const int LABEL_H = 18;   // label height
-            const int INPUT_H = 32;   // normal textbox height
-            const int MULTI_H = 72;   // multiline textbox height
-            const int ROW_GAP = 14;   // vertical space between rows
-            const int HEADER_H = 46;   // section title area height
+            const int PADDING = 20;
+            const int GAP = 16;
+            const int LABEL_H = 18;
+            const int INPUT_H = 32;
+            const int MULTI_H = 72;
+            const int ROW_GAP = 14;
+            const int HEADER_H = 46;
             const int BOTTOM_PAD = 18;
 
             boxes = new TextBox[labels.Length];
 
-            // pre-calculate total card height
             int rows = (int)Math.Ceiling(labels.Length / 2.0);
             int cardH = HEADER_H + BOTTOM_PAD;
             for (int r = 0; r < rows; r++)
             {
-                // check if any field in this row is multiline
                 bool rowHasMulti = false;
                 for (int c = 0; c < 2; c++)
                 {
@@ -364,7 +359,6 @@ namespace HRApplicant
                     e.Graphics.FillEllipse(br, PADDING, 17, 6, 6);
             };
 
-            // section title
             card.Controls.Add(new Label
             {
                 Text = title,
@@ -377,7 +371,6 @@ namespace HRApplicant
                 Anchor = AnchorStyles.Top | AnchorStyles.Left
             });
 
-            // divider
             Panel divider = new Panel
             {
                 Left = 0,
@@ -390,11 +383,9 @@ namespace HRApplicant
             card.SizeChanged += (s, e) => divider.Width = card.Width;
             card.Controls.Add(divider);
 
-            // build fields and store refs for resize
             var lbls = new Label[labels.Length];
             var txts = new TextBox[labels.Length];
 
-            // compute initial column width
             int initialColW = Math.Max(60, (card.Width - PADDING * 2 - GAP) / 2);
 
             int fy = HEADER_H;
@@ -456,7 +447,6 @@ namespace HRApplicant
                 fy += LABEL_H + inputH + 2 + ROW_GAP;
             }
 
-            // on resize: recompute colW and reposition all labels + textboxes
             card.SizeChanged += (s, e) =>
             {
                 int colW = Math.Max(60, (card.Width - PADDING * 2 - GAP) / 2);
@@ -494,7 +484,7 @@ namespace HRApplicant
         }
 
         // ── Drawing helpers ────────────────────────────────────────────
-        private static void DrawRoundedRect(Graphics g, Pen pen, int x, int y, int w, int h, int r)
+        private void DrawRoundedRect(Graphics g, Pen pen, int x, int y, int w, int h, int r)
         {
             using (var path = new GraphicsPath())
             {
@@ -507,34 +497,46 @@ namespace HRApplicant
             }
         }
 
-        // ── Helper method to set DoubleBuffered using reflection ────────
-        private static void SetDoubleBuffered(Control control, bool doubleBuffered)
+        private void SetDoubleBuffered(Control control, bool doubleBuffered)
         {
             try
             {
                 var property = typeof(Control).GetProperty("DoubleBuffered",
                     System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
                 if (property != null && property.CanWrite)
-                {
                     property.SetValue(control, doubleBuffered);
-                }
             }
             catch { }
         }
 
-        // ── Helper method to set control styles for optimization ────────
-        private static void SetControlStyle(Control control, ControlStyles styles, bool value)
+        private void SetControlStyle(Control control, ControlStyles styles, bool value)
         {
             try
             {
                 var method = typeof(Control).GetMethod("SetStyle",
                     System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
                 if (method != null)
-                {
                     method.Invoke(control, new object[] { styles, value });
-                }
             }
             catch { }
+        }
+
+        private void InitializeComponent()
+        {
+            SuspendLayout();
+            // 
+            // ApplicantStatusTrackingPage
+            // 
+            ClientSize = new Size(284, 261);
+            Name = "ApplicantProfilePage";
+            Load += ApplicantProfilePage_Load;
+            ResumeLayout(false);
+
+        }
+
+        private void ApplicantProfilePage_Load(object sender, EventArgs e)
+        {
+
         }
     }
 }
