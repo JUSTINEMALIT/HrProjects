@@ -7,17 +7,26 @@ using System.Windows.Forms;
 
 namespace HRApplicant
 {
-    public static class ApplicantMyDocumentsPage
+    public class ApplicantMyDocumentsPage : Form
     {
-        public static void Show(ApplicantMainForm main)
+        private ApplicantMainForm mainForm;
+        private Panel contentPanel;
+
+        public ApplicantMyDocumentsPage(ApplicantMainForm main)
         {
-            main.ClearContent();
-            var p = main.contentPanel;
+            this.mainForm = main;
+            this.contentPanel = main.contentPanel;
+            InitializePage();
+        }
+
+        private void InitializePage()
+        {
+            mainForm.ClearContent();
+            var p = contentPanel;
             var db = new DatabaseConnection();
 
             p.Controls.Add(new Label { Text = "My Documents", Font = new Font("Segoe UI", 15f, FontStyle.Bold), ForeColor = Color.FromArgb(220, 235, 228), Left = 28, Top = 18, AutoSize = true, BackColor = Color.Transparent });
 
-            // Load ALL applications
             DataTable allApps = db.Query(
                 @"SELECT a.id, a.status, jv.title AS job_title, d.name AS department
                   FROM applications a
@@ -52,7 +61,6 @@ namespace HRApplicant
             cmbJobs.SelectedIndex = 0;
             p.Controls.Add(cmbJobs);
 
-            // Content panel
             Panel docContent = new Panel
             {
                 Left = 0,
@@ -70,13 +78,10 @@ namespace HRApplicant
             {
                 docContent.Controls.Clear();
 
-                // Get app status — fresh query para sure tama
                 object statusObj = db.Scalar("SELECT status FROM applications WHERE id=@id", ("@id", appId));
                 string appStatus = statusObj == null || statusObj == DBNull.Value ? "Draft" : statusObj.ToString();
-                // Allow upload for Draft and Submitted only — lock when HR starts review
                 bool canUpload = appStatus == "Draft" || appStatus == "Submitted";
 
-                // Summary counts
                 DataTable docs = db.Query(
                     @"SELECT ad.id, rt.name AS doc_name, ad.status, ad.hr_remarks, ad.file_name, ad.uploaded_at
                       FROM applicant_documents ad
@@ -136,8 +141,8 @@ namespace HRApplicant
                         doc["file_name"] == DBNull.Value ? "—" : doc["file_name"].ToString(),
                         doc["uploaded_at"] == DBNull.Value ? "—" : Convert.ToDateTime(doc["uploaded_at"]).ToString("MMM dd, yyyy"),
                         doc["hr_remarks"] == DBNull.Value ? "" : doc["hr_remarks"].ToString(),
-                        canUpload, p.Width - 56, main, appId,
-                        () => loadDocs(appId));  // refresh callback
+                        canUpload, p.Width - 56, mainForm, appId,
+                        () => loadDocs(appId));
                     row.Left = 28; row.Top = top;
                     row.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
                     docContent.Controls.Add(row);
@@ -145,11 +150,9 @@ namespace HRApplicant
                 }
             };
 
-            // Load first app docs
             int firstAppId = Convert.ToInt32(allApps.Rows[0]["id"]);
             loadDocs(firstAppId);
 
-            // Switch on dropdown change
             cmbJobs.SelectedIndexChanged += (s, e) =>
             {
                 if (cmbJobs.SelectedIndex < 0) return;
@@ -159,7 +162,7 @@ namespace HRApplicant
             };
         }
 
-        private static Panel BuildDocRow(int docId, string name, string status, string fileName,
+        private Panel BuildDocRow(int docId, string name, string status, string fileName,
             string uploadedAt, string remarks, bool canUpload, int width,
             ApplicantMainForm main, int appId, Action refresh)
         {
@@ -183,7 +186,7 @@ namespace HRApplicant
             row.Controls.Add(new Label { Text = uploadedAt, Font = new Font("Segoe UI", 8f), ForeColor = Color.FromArgb(100, 120, 110), Left = 518, Top = 13, Width = 110, BackColor = Color.Transparent });
             row.Controls.Add(new Label { Text = remarks, Font = new Font("Segoe UI", 8f), ForeColor = Color.FromArgb(110, 130, 120), Left = 636, Top = 13, Width = 180, BackColor = Color.Transparent });
 
-            // View button — visible kahit locked, basta may file
+            // View button
             if (status == "Submitted" || status == "Validated")
             {
                 Button btnView = new Button
@@ -201,10 +204,8 @@ namespace HRApplicant
                     Cursor = Cursors.Hand
                 };
                 btnView.FlatAppearance.BorderSize = 0;
-                string capturedFile = fileName;
                 btnView.Click += (s, e) =>
                 {
-                    // fileName lang ang nasa display — kailangan nating kuhanin ang file_path mula DB
                     try
                     {
                         object fp = new DatabaseConnection().Scalar(
@@ -238,7 +239,7 @@ namespace HRApplicant
                 row.Controls.Add(btnView);
             }
 
-                if (canUpload && status != "Validated")
+            if (canUpload && status != "Validated")
             {
                 string btnTxt = status == "Submitted" ? "Replace" : "Upload";
                 Color btnCol = status == "Submitted" ? Color.FromArgb(28, 60, 80) : Color.FromArgb(28, 70, 48);
@@ -273,7 +274,7 @@ namespace HRApplicant
             return row;
         }
 
-        private static Panel SummaryBadge(string label, string value, Color accent, Color bg, int left)
+        private Panel SummaryBadge(string label, string value, Color accent, Color bg, int left)
         {
             Panel badge = new Panel { Left = left, Top = 4, Width = 108, Height = 42, BackColor = bg };
             badge.Paint += (s, e) => { Pen pen = new Pen(accent, 1); e.Graphics.DrawRectangle(pen, 0, 0, badge.Width - 1, badge.Height - 1); pen.Dispose(); };
@@ -282,9 +283,27 @@ namespace HRApplicant
             return badge;
         }
 
-        private static Label MakeHdr(string text, int left, int width)
+        private Label MakeHdr(string text, int left, int width)
         {
             return new Label { Text = text, Font = new Font("Segoe UI", 7.5f, FontStyle.Bold), ForeColor = Color.FromArgb(80, 110, 95), Left = left, Top = 7, Width = width, BackColor = Color.Transparent };
+        }
+
+        private void InitializeComponent()
+        {
+            SuspendLayout();
+            // 
+            // ApplicantStatusTrackingPage
+            // 
+            ClientSize = new Size(284, 261);
+            Name = "ApplicantMyDocumentsPage";
+            Load += ApplicantMyDocumentsPage_Load;
+            ResumeLayout(false);
+
+        }
+
+        private void ApplicantMyDocumentsPage_Load(object sender, EventArgs e)
+        {
+
         }
     }
 }

@@ -1,13 +1,13 @@
-﻿using project;
-using System;
+﻿using System;
 using System.Data;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using project;
 
 namespace HRApplicant
 {
-    public static class ApplicantDashboardPage
+    public class ApplicantDashboardPage : Form
     {
         // ── Design Tokens ─────────────────────────────────────────────
         private static readonly Color BgPage = Color.FromArgb(13, 15, 18);
@@ -23,12 +23,20 @@ namespace HRApplicant
         private static readonly Color AccentPurple = Color.FromArgb(167, 119, 255);
         private static readonly Color AccentRed = Color.FromArgb(248, 81, 73);
 
-        public static void Show(ApplicantMainForm main)
+        private Panel contentPanel;
+        private ApplicantMainForm mainForm;
+
+        public ApplicantDashboardPage(ApplicantMainForm mainForm)
         {
-            main.ClearContent();
-            var p = main.contentPanel;
-            p.BackColor = BgPage;
-            var db = new DatabaseConnection();
+            this.mainForm = mainForm;
+            this.contentPanel = mainForm.contentPanel;
+            InitializePage();
+        }
+
+        private void InitializePage()
+        {
+            mainForm.ClearContent();
+            DatabaseConnection db = new DatabaseConnection();
 
             int top = 0;
 
@@ -37,14 +45,14 @@ namespace HRApplicant
             {
                 Left = 0,
                 Top = 0,
-                Width = p.Width,
+                Width = contentPanel.Width,
                 Height = 80,
                 BackColor = Color.Transparent,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             header.Paint += (s, e) =>
             {
-                using (var pen = new Pen(Color.FromArgb(32, BorderSubtle), 1))
+                using (var pen = new Pen(BorderSubtle, 1))
                     e.Graphics.DrawLine(pen, 32, header.Height - 1, header.Width - 32, header.Height - 1);
             };
             header.Controls.Add(new Label
@@ -69,14 +77,14 @@ namespace HRApplicant
                 BackColor = Color.Transparent,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left
             });
-            p.Controls.Add(header);
+            contentPanel.Controls.Add(header);
             top += 90;
 
             // ── Stat Cards ────────────────────────────────────────────
-            int totalApps = ToInt(db.Scalar("SELECT COUNT(*) FROM applications WHERE applicant_id=@aid", ("@aid", project.Session.ApplicantId)));
-            int submitted = ToInt(db.Scalar("SELECT COUNT(*) FROM applications WHERE applicant_id=@aid AND status != 'Draft'", ("@aid", project.Session.ApplicantId)));
-            int underReview = ToInt(db.Scalar("SELECT COUNT(*) FROM applications WHERE applicant_id=@aid AND status='Under Review'", ("@aid", project.Session.ApplicantId)));
-            int interviews = ToInt(db.Scalar("SELECT COUNT(*) FROM interview_schedules is2 JOIN applications a ON a.id=is2.application_id WHERE a.applicant_id=@aid AND is2.status='Scheduled'", ("@aid", project.Session.ApplicantId)));
+            int totalApps = ToInt(db.Scalar("SELECT COUNT(*) FROM applications WHERE applicant_id=@aid", ("@aid", Session.ApplicantId)));
+            int submitted = ToInt(db.Scalar("SELECT COUNT(*) FROM applications WHERE applicant_id=@aid AND status != 'Draft'", ("@aid", Session.ApplicantId)));
+            int underReview = ToInt(db.Scalar("SELECT COUNT(*) FROM applications WHERE applicant_id=@aid AND status='Under Review'", ("@aid", Session.ApplicantId)));
+            int interviews = ToInt(db.Scalar("SELECT COUNT(*) FROM interview_schedules is2 JOIN applications a ON a.id=is2.application_id WHERE a.applicant_id=@aid AND is2.status='Scheduled'", ("@aid", Session.ApplicantId)));
 
             var statDefs = new[]
             {
@@ -86,12 +94,11 @@ namespace HRApplicant
                 ("Upcoming Interviews", interviews.ToString(),   AccentPurple, "📅"),
             };
 
-            // Use TableLayoutPanel so stat cards stretch evenly on resize
             TableLayoutPanel statRow = new TableLayoutPanel
             {
                 Left = 32,
                 Top = top,
-                Width = p.Width - 64,
+                Width = contentPanel.Width - 64,
                 Height = 96,
                 BackColor = Color.Transparent,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
@@ -112,11 +119,11 @@ namespace HRApplicant
                 statRow.Controls.Add(sc, colIdx, 0);
                 colIdx++;
             }
-            p.Controls.Add(statRow);
+            contentPanel.Controls.Add(statRow);
             top += 112;
 
             // ── Missing Documents ─────────────────────────────────────
-            top = AddSectionLabel(p, "MISSING DOCUMENTS", top);
+            top = AddSectionLabel(contentPanel, "MISSING DOCUMENTS", top);
 
             DataTable missingDocs = db.Query(
                 @"SELECT DISTINCT a.id, CONCAT(ap.first_name,' ',ap.last_name) AS name, jv.title AS job,
@@ -132,7 +139,7 @@ namespace HRApplicant
 
             if (missingDocs.Rows.Count == 0)
             {
-                p.Controls.Add(EmptyState("✓  No missing documents — you're all caught up!", AccentGreen, 32, top));
+                contentPanel.Controls.Add(EmptyState("✓  No missing documents — you're all caught up!", AccentGreen, 32, top));
                 top += 40;
             }
             else
@@ -140,7 +147,7 @@ namespace HRApplicant
                 foreach (DataRow row in missingDocs.Rows)
                 {
                     int count = Convert.ToInt32(row["missing_count"]);
-                    Panel card = CreateCard(28, top, p.Width - 56, 56);
+                    Panel card = CreateCard(28, top, contentPanel.Width - 56, 56);
                     card.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 
                     card.Controls.Add(new Panel { Left = 0, Top = 0, Width = 3, Height = 56, BackColor = AccentRed, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Bottom });
@@ -149,7 +156,6 @@ namespace HRApplicant
                     MakeRound(dot, 4);
                     card.Controls.Add(dot);
 
-                    // job title — stretches, leaves room for count label on right
                     card.Controls.Add(new Label
                     {
                         Text = row["job"].ToString(),
@@ -173,7 +179,6 @@ namespace HRApplicant
                         BackColor = Color.Transparent,
                         Anchor = AnchorStyles.Top | AnchorStyles.Left
                     });
-                    // count — pinned to right
                     card.Controls.Add(new Label
                     {
                         Text = count + (count == 1 ? " document missing" : " documents missing"),
@@ -187,19 +192,18 @@ namespace HRApplicant
                         BackColor = Color.Transparent,
                         Anchor = AnchorStyles.Top | AnchorStyles.Right | AnchorStyles.Bottom
                     });
-                    // set Right-anchored label left after adding to card via Resize trick
                     Label missingLbl = (Label)card.Controls[card.Controls.Count - 1];
                     card.SizeChanged += (s, e) => missingLbl.Left = card.Width - 180;
                     missingLbl.Left = card.Width - 180;
 
-                    p.Controls.Add(card);
+                    contentPanel.Controls.Add(card);
                     top += 62;
                 }
             }
             top += 12;
 
             // ── Recent Applications ───────────────────────────────────
-            top = AddSectionLabel(p, "RECENT APPLICATIONS", top);
+            top = AddSectionLabel(contentPanel, "RECENT APPLICATIONS", top);
 
             DataTable recent = db.Query(
                 @"SELECT a.id, a.status, jv.title AS job, a.submitted_at, a.created_at,
@@ -212,7 +216,7 @@ namespace HRApplicant
 
             if (recent.Rows.Count == 0)
             {
-                p.Controls.Add(EmptyState("No applications yet.", TextMuted, 32, top));
+                contentPanel.Controls.Add(EmptyState("No applications yet.", TextMuted, 32, top));
                 top += 40;
             }
             else
@@ -226,12 +230,11 @@ namespace HRApplicant
                         ? "Draft"
                         : "Submitted " + Convert.ToDateTime(row["submitted_at"]).ToString("MMM dd");
 
-                    Panel card = CreateCard(28, top, p.Width - 56, 58);
+                    Panel card = CreateCard(28, top, contentPanel.Width - 56, 58);
                     card.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 
                     card.Controls.Add(new Panel { Left = 0, Top = 0, Width = 3, Height = 58, BackColor = statusColor, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Bottom });
 
-                    // job title — stretches
                     card.Controls.Add(new Label
                     {
                         Text = row["job"].ToString(),
@@ -247,7 +250,6 @@ namespace HRApplicant
                     card.SizeChanged += (s, e) => jobLbl.Width = card.Width - 18 - 140;
                     jobLbl.Width = card.Width - 18 - 140;
 
-                    // status pill — pinned right
                     Panel pill = MakePill(status, statusColor, 0, 10);
                     pill.Anchor = AnchorStyles.Top | AnchorStyles.Right;
                     card.Controls.Add(pill);
@@ -266,7 +268,6 @@ namespace HRApplicant
                         Anchor = AnchorStyles.Bottom | AnchorStyles.Left
                     });
 
-                    // date label — pinned right
                     Label dateLbl = new Label
                     {
                         Text = dateStr,
@@ -283,14 +284,14 @@ namespace HRApplicant
                     card.SizeChanged += (s, e) => dateLbl.Left = card.Width - 164;
                     dateLbl.Left = card.Width - 164;
 
-                    p.Controls.Add(card);
+                    contentPanel.Controls.Add(card);
                     top += 64;
                 }
             }
             top += 12;
 
             // ── Upcoming Interviews ───────────────────────────────────
-            top = AddSectionLabel(p, "UPCOMING INTERVIEWS", top);
+            top = AddSectionLabel(contentPanel, "UPCOMING INTERVIEWS", top);
 
             DataTable interviews2 = db.Query(
                 @"SELECT jv.title AS job, is2.interview_type, is2.scheduled_date, is2.scheduled_time,
@@ -304,14 +305,14 @@ namespace HRApplicant
 
             if (interviews2.Rows.Count == 0)
             {
-                p.Controls.Add(EmptyState("No upcoming interviews scheduled.", TextMuted, 32, top));
+                contentPanel.Controls.Add(EmptyState("No upcoming interviews scheduled.", TextMuted, 32, top));
                 top += 40;
             }
             else
             {
                 foreach (DataRow row in interviews2.Rows)
                 {
-                    Panel card = CreateCard(28, top, p.Width - 56, 68);
+                    Panel card = CreateCard(28, top, contentPanel.Width - 56, 68);
                     card.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
                     card.Controls.Add(new Panel { Left = 0, Top = 0, Width = 3, Height = 68, BackColor = AccentBlue, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Bottom });
 
@@ -341,7 +342,6 @@ namespace HRApplicant
                     });
                     card.Controls.Add(dateBadge);
 
-                    // all text labels — stretch to right edge
                     card.Controls.Add(new Label
                     {
                         Text = row["job"].ToString() + "  ·  " + row["interview_type"],
@@ -380,7 +380,7 @@ namespace HRApplicant
                         Anchor = AnchorStyles.Top | AnchorStyles.Left
                     });
 
-                    p.Controls.Add(card);
+                    contentPanel.Controls.Add(card);
                     top += 74;
                 }
             }
@@ -390,7 +390,7 @@ namespace HRApplicant
 
         // ── Helpers ───────────────────────────────────────────────────
 
-        private static Panel StatCard(string title, string value, Color accent, string icon)
+        private Panel StatCard(string title, string value, Color accent, string icon)
         {
             Panel card = new Panel { Height = 94, BackColor = BgCard };
             card.Paint += (s, e) =>
@@ -435,13 +435,12 @@ namespace HRApplicant
                 BackColor = Color.Transparent,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             });
-            // keep label width in sync
             Label titleLbl = (Label)card.Controls[card.Controls.Count - 1];
             card.SizeChanged += (s, e) => titleLbl.Width = card.Width - 20;
             return card;
         }
 
-        private static Panel MakePill(string text, Color color, int left, int top)
+        private Panel MakePill(string text, Color color, int left, int top)
         {
             Panel pill = new Panel { Left = left, Top = top, Width = 120, Height = 20, BackColor = Color.FromArgb(30, color) };
             MakeRound(pill, 10);
@@ -457,7 +456,7 @@ namespace HRApplicant
             return pill;
         }
 
-        private static Panel CreateCard(int left, int top, int width, int height)
+        private Panel CreateCard(int left, int top, int width, int height)
         {
             Panel card = new Panel
             {
@@ -478,7 +477,7 @@ namespace HRApplicant
             return card;
         }
 
-        private static Label EmptyState(string text, Color color, int left, int top)
+        private Label EmptyState(string text, Color color, int left, int top)
         {
             return new Label
             {
@@ -494,7 +493,7 @@ namespace HRApplicant
             };
         }
 
-        private static int AddSectionLabel(Panel p, string text, int top)
+        private int AddSectionLabel(Panel p, string text, int top)
         {
             p.Controls.Add(new Label
             {
@@ -510,7 +509,7 @@ namespace HRApplicant
             return top + 26;
         }
 
-        private static void MakeRound(Control ctrl, int radius)
+        private void MakeRound(Control ctrl, int radius)
         {
             var path = new GraphicsPath();
             path.AddArc(0, 0, radius * 2, radius * 2, 180, 90);
@@ -521,7 +520,7 @@ namespace HRApplicant
             ctrl.Region = new Region(path);
         }
 
-        private static void DrawRoundedRect(Graphics g, Pen pen, int x, int y, int w, int h, int r)
+        private void DrawRoundedRect(Graphics g, Pen pen, int x, int y, int w, int h, int r)
         {
             using (var path = new GraphicsPath())
             {
@@ -534,7 +533,7 @@ namespace HRApplicant
             }
         }
 
-        private static Color GetStatusColor(string status)
+        private Color GetStatusColor(string status)
         {
             if (status == "Draft") return Color.FromArgb(130, 130, 160);
             if (status == "Submitted") return Color.FromArgb(56, 149, 255);
@@ -549,6 +548,24 @@ namespace HRApplicant
             return Color.FromArgb(150, 150, 150);
         }
 
-        private static int ToInt(object v) => v == null || v == DBNull.Value ? 0 : Convert.ToInt32(v);
+        private int ToInt(object v) => v == null || v == DBNull.Value ? 0 : Convert.ToInt32(v);
+
+        private void InitializeComponent()
+        {
+            SuspendLayout();
+            // 
+            // ApplicantStatusTrackingPage
+            // 
+            ClientSize = new Size(284, 261);
+            Name = "ApplicantDashboardPage";
+            Load += ApplicantDashboardPage_Load;
+            ResumeLayout(false);
+
+        }
+
+        private void ApplicantDashboardPage_Load(object sender, EventArgs e)
+        {
+
+        }
     }
 }

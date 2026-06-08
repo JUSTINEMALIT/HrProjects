@@ -55,7 +55,7 @@ namespace HRApplicant
 
             Label lblUser = new Label
             {
-                Text = "  " + Session.FullName,
+                Text = "  " + project.Session.FullName,
                 ForeColor = Color.FromArgb(200, 220, 210),
                 Font = new Font("Segoe UI", 9f),
                 AutoSize = false,
@@ -183,12 +183,12 @@ namespace HRApplicant
             active.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
         }
 
-        private void ShowDashboard() => ApplicantDashboardPage.Show(this);
-        private void ShowProfile() => ApplicantProfilePage.Show(this);
-        private void ShowJobVacancies() => ApplicantJobVacanciesPage.Show(this);
-        private void ShowMyApplication() => ApplicantMyApplicationPage.Show(this);
-        private void ShowMyDocuments() => ApplicantMyDocumentsPage.Show(this);
-        private void ShowStatusTracking() => ApplicantStatusTrackingPage.Show(this);
+        private void ShowDashboard() => new ApplicantDashboardPage(this);
+        private void ShowProfile() => new ApplicantProfilePage(this);
+        private void ShowJobVacancies() => new ApplicantJobVacanciesPage(this);
+        private void ShowMyApplication() => new ApplicantMyApplicationPage(this);
+        private void ShowMyDocuments() => new ApplicantMyDocumentsPage(this);
+        private void ShowStatusTracking() => new ApplicantStatusTrackingPage(this);
 
         private void ApplicantMainForm_Load(object sender, EventArgs e)
         {

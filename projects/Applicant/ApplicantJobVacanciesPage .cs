@@ -6,13 +6,23 @@ using System.Windows.Forms;
 
 namespace HRApplicant
 {
-    public static class ApplicantJobVacanciesPage
+    public class ApplicantJobVacanciesPage : Form
     {
-        public static void Show(ApplicantMainForm main)
+        private ApplicantMainForm mainForm;
+        private Panel contentPanel;
+
+        public ApplicantJobVacanciesPage(ApplicantMainForm main)
+        {
+            this.mainForm = main;
+            this.contentPanel = main.contentPanel;
+            InitializePage();
+        }
+
+        private void InitializePage()
         {
             var db = new DatabaseConnection();
-            main.ClearContent();
-            var p = main.contentPanel;
+            mainForm.ClearContent();
+            var p = contentPanel;
 
             p.Controls.Add(new Label { Text = "Job Vacancies", Font = new Font("Segoe UI", 15f, FontStyle.Bold), ForeColor = Color.FromArgb(220, 235, 228), Left = 28, Top = 18, AutoSize = true, BackColor = Color.Transparent });
             p.Controls.Add(new Label { Text = "Browse open positions and submit your application.", Font = new Font("Segoe UI", 9f), ForeColor = Color.FromArgb(100, 130, 115), Left = 29, Top = 46, AutoSize = true, BackColor = Color.Transparent });
@@ -145,7 +155,7 @@ namespace HRApplicant
                         row["employment_type"].ToString(), row["slots"].ToString(),
                         row["status"].ToString(), postedAt,
                         row["qualifications"].ToString(),
-                        isOpen, alreadyApplied, listPanel.Width - 4, main);
+                        isOpen, alreadyApplied, listPanel.Width - 4, mainForm);
 
                     card.Left = 0; card.Top = cardTop;
                     card.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
@@ -159,7 +169,7 @@ namespace HRApplicant
             loadJobs();
         }
 
-        private static Panel BuildJobCard(int jobId, string title, string dept, string type,
+        private Panel BuildJobCard(int jobId, string title, string dept, string type,
             string slots, string status, string posted, string qualifications,
             bool isOpen, bool alreadyApplied, int width, ApplicantMainForm main)
         {
@@ -269,7 +279,7 @@ namespace HRApplicant
 
                         Audit.Log("Applied for job: " + capturedTitle, "applications", newAppId);
                         MessageBox.Show("Application created! Status: Draft.\nGo to My Application to fill in details.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        ApplicantJobVacanciesPage.Show(main); // refresh
+                        new ApplicantJobVacanciesPage(main); // refresh
                     }
                     catch (Exception ex)
                     {
@@ -279,6 +289,25 @@ namespace HRApplicant
             }
             card.Controls.Add(btnApply);
             return card;
+        }
+
+
+        private void InitializeComponent()
+        {
+            SuspendLayout();
+            // 
+            // ApplicantStatusTrackingPage
+            // 
+            ClientSize = new Size(284, 261);
+            Name = "ApplicantJobVacanciesPage";
+            Load += ApplicantJobVacanciesPage_Load;
+            ResumeLayout(false);
+
+        }
+
+        private void ApplicantJobVacanciesPage_Load(object sender, EventArgs e)
+        {
+
         }
     }
 }
