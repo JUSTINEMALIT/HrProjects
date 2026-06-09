@@ -35,7 +35,6 @@ namespace projects.HRManager
             ("📊", "Recruitment Statistics",  "recruitment_stats", "Total applicants, pass/fail rates and pipeline overview."),
             ("📋", "Applicant Report",         "applicant_report",  "Full list of applicants with status and job details."),
             ("✅", "Hiring Results",            "hiring_results",    "Accepted, rejected and on-hold hiring decisions."),
-            ("📅", "Interview Report",          "interview_report",  "Scheduled interviews with dates, scores and remarks."),
             ("❌", "Missing Documents",         "missing_docs",      "Applicants with incomplete document submissions."),
             ("⏳", "Pending Applications",      "pending_apps",      "Applications still awaiting action or review."),
         };
@@ -210,25 +209,6 @@ namespace projects.HRManager
                           LEFT JOIN hiring_decisions hd ON hd.application_id = a.id
                           WHERE a.status IN ('Accepted','Rejected','On Hold')
                           ORDER BY hd.decided_at DESC"),
-
-                    "interview_report" => db.Query(
-                        @"SELECT
-                            a.id AS app_id,
-                            CONCAT(ap.first_name,' ',ap.last_name) AS applicant_name,
-                            jv.title AS position,
-                            s.interview_date,
-                            s.interview_time,
-                            s.interview_type,
-                            s.location,
-                            e.score,
-                            e.recommendation,
-                            e.remarks AS eval_remarks
-                          FROM applications a
-                          JOIN applicants ap    ON ap.id = a.applicant_id
-                          JOIN job_vacancies jv ON jv.id = a.job_vacancy_id
-                          LEFT JOIN interview_schedules s ON s.application_id = a.id
-                          LEFT JOIN interview_evaluations e ON e.application_id = a.id
-                          ORDER BY s.interview_date DESC"),
 
                     "missing_docs" => db.Query(
                         @"SELECT

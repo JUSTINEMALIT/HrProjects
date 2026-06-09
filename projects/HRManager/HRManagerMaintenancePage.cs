@@ -56,7 +56,7 @@ namespace projects.HRManager
 
             p.Controls.Add(new Label
             {
-                Text = "Manage system reference data: departments, positions, employment types, etc.",
+                Text = "Manage system reference data: departments, employment types, etc.",
                 Font = new Font("Segoe UI", 10f),
                 ForeColor = TextSecondary,
                 Left = 24,
@@ -66,8 +66,8 @@ namespace projects.HRManager
             });
             top += 32;
 
-            string[] categories = { "Departments", "Positions", "Employment Types", "Requirement Types", "Interview Types", "Assessment Types" };
-            string[] tables = { "departments", "positions", "employment_types", "requirement_types", "interview_types", "assessment_types" };
+            string[] categories = { "Departments", "Employment Types", "Requirement Types", "Interview Types", "Assessment Types" };
+            string[] tables = { "departments", "employment_types", "requirement_types", "interview_types", "assessment_types" };
             string[] columns = { "name", "name", "name", "name", "name", "name" };
 
             for (int i = 0; i < categories.Length; i++)
