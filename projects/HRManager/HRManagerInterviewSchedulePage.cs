@@ -59,7 +59,7 @@ namespace projects.HRManager
                 Font = new Font("Segoe UI", 10f),
                 ForeColor = TextSecondary,
                 Left = 24,
-                Top = top,
+                Top = 70,
                 AutoSize = true,
                 BackColor = Color.Transparent
             });
