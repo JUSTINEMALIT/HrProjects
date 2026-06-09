@@ -28,6 +28,9 @@ namespace project
 
             BuildUI();
             LoadDashboardView(); // Unang ipapakita ang Dashboard summary
+
+            MaintenanceForm maintenance = new MaintenanceForm();
+            maintenance.Show();
         }
 
         private void BuildUI()
@@ -238,6 +241,23 @@ namespace project
             path.AddArc(0, control.Height - radius - 1, radius, radius, 90, 90);
             path.CloseAllFigures();
             control.Region = new Region(path);
+        }
+
+        private void InitializeComponent()
+        {
+            SuspendLayout();
+            // 
+            // ApplicantStatusTrackingPage
+            // 
+            ClientSize = new Size(284, 261);
+            Name = "ApplicantDashboardPage";
+            Load += ApplicantDashboardPage_Load;
+            ResumeLayout(false);
+        }
+
+        private void ApplicantDashboardPage_Load(object sender, EventArgs e)
+        {
+
         }
     }
 }
