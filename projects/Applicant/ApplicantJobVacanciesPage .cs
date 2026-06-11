@@ -132,7 +132,16 @@ namespace HRApplicant
                 DataTable applied = db.Query(
                     "SELECT job_vacancy_id FROM applications WHERE applicant_id=@aid",
                     ("@aid", project.Session.ApplicantId));
+
+                // Check if applicant already has an Accepted application
+                object acceptedCheck = db.Scalar(
+                    "SELECT COUNT(*) FROM applications WHERE applicant_id=@aid AND status='Accepted'",
+                    ("@aid", project.Session.ApplicantId));
+
+                bool hasAcceptedApplication = Convert.ToInt32(acceptedCheck) > 0;
+
                 System.Collections.Generic.HashSet<int> appliedIds = new System.Collections.Generic.HashSet<int>();
+
                 foreach (DataRow r in applied.Rows)
                     appliedIds.Add(Convert.ToInt32(r["job_vacancy_id"]));
 
@@ -148,6 +157,12 @@ namespace HRApplicant
                     int jobId = Convert.ToInt32(row["id"]);
                     bool isOpen = row["status"].ToString() == "Open";
                     bool alreadyApplied = appliedIds.Contains(jobId);
+
+                    if (hasAcceptedApplication)
+                    {
+                        alreadyApplied = true;
+                    }
+
                     string postedAt = Convert.ToDateTime(row["posted_at"]).ToString("MMM dd, yyyy");
 
                     Panel card = BuildJobCard(
@@ -235,9 +250,28 @@ namespace HRApplicant
                 btnApply.Click += (s, e) =>
                 {
                     var db = new DatabaseConnection();
+
+                    // Applicant already accepted? Lock all future applications.
+                    object acceptedCheck = db.Scalar(
+                        "SELECT COUNT(*) FROM applications WHERE applicant_id=@aid AND status='Accepted'",
+                        ("@aid", project.Session.ApplicantId));
+
+                    if (Convert.ToInt32(acceptedCheck) > 0)
+                    {
+                        MessageBox.Show(
+                            "You have already been accepted for a position and can no longer apply for other job vacancies.",
+                            "Application Locked",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
+
+                        return;
+                    }
+
                     var result = MessageBox.Show(
                         "Apply for \"" + capturedTitle + "\"?\n\nThis will create a new Draft application.",
-                        "Confirm Application", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                        "Confirm Application",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question);
                     if (result != DialogResult.Yes) return;
                     try
                     {
