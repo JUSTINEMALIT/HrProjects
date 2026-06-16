@@ -84,7 +84,11 @@ namespace HRApplicant
             btnLogout.FlatAppearance.BorderColor = Color.FromArgb(60, 140, 90);
             btnLogout.Click += (s, e) =>
             {
+                var r = MessageBox.Show("Are you sure you want to logout?", "Logout",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (r != DialogResult.Yes) return;
                 Session.Clear();
+                new ApplicantPortal.LoginForm().Show();
                 this.Close();
             };
 

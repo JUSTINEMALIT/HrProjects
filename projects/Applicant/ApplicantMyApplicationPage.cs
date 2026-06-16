@@ -1,5 +1,6 @@
 ﻿using project;
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
@@ -91,6 +92,7 @@ namespace HRApplicant
                 DataRow app = appDt.Rows[0];
                 string status = app["status"].ToString();
                 bool isEditable = status == "Draft" || status == "Submitted";
+                bool isWithdrawn = status == "Withdrawn";
                 mainForm.applicationStatus = status;
 
                 string SafeStr(object v) => v == DBNull.Value ? "" : v.ToString();
@@ -98,12 +100,30 @@ namespace HRApplicant
 
                 int top = 10;
 
-                // Sub-label
+                // ✅ Sub-label — different message for Withdrawn vs locked
+                string subLabelText;
+                Color subLabelColor;
+                if (isWithdrawn)
+                {
+                    subLabelText = "You have already withdrawn this application.";
+                    subLabelColor = Color.FromArgb(200, 100, 100);
+                }
+                else if (isEditable)
+                {
+                    subLabelText = "You can still edit this application.";
+                    subLabelColor = Color.FromArgb(100, 130, 115);
+                }
+                else
+                {
+                    subLabelText = "This application is locked — HR is reviewing it.";
+                    subLabelColor = Color.FromArgb(200, 140, 60);
+                }
+
                 appContent.Controls.Add(new Label
                 {
-                    Text = isEditable ? "You can still edit this application." : "This application is locked — HR is reviewing it.",
+                    Text = subLabelText,
                     Font = new Font("Segoe UI", 9f),
-                    ForeColor = isEditable ? Color.FromArgb(100, 130, 115) : Color.FromArgb(200, 140, 60),
+                    ForeColor = subLabelColor,
                     Left = 28,
                     Top = top,
                     AutoSize = true,
@@ -111,12 +131,87 @@ namespace HRApplicant
                 });
                 top += 26;
 
-                // Lock banner
-                if (!isEditable)
+                // ✅ Banner — show withdrawal reason if withdrawn, otherwise lock banner
+                if (isWithdrawn)
                 {
-                    Panel lockBanner = new Panel { Left = 28, Top = top, Width = p.Width - 56, Height = 34, BackColor = Color.FromArgb(45, 38, 22), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-                    lockBanner.Paint += (s, e) => { Pen pen = new Pen(Color.FromArgb(80, 60, 20), 1); e.Graphics.DrawRectangle(pen, 0, 0, lockBanner.Width - 1, lockBanner.Height - 1); pen.Dispose(); };
-                    lockBanner.Controls.Add(new Label { Text = "🔒  Locked — Status: " + status, Font = new Font("Segoe UI", 8.5f), ForeColor = Color.FromArgb(220, 160, 60), Left = 12, Height = 34, Width = 500, TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.Transparent });
+                    // Fetch withdrawal reason from status history
+                    object withdrawRemarks = db.Scalar(
+                        @"SELECT remarks FROM application_status_history
+                          WHERE application_id = @id AND status = 'Withdrawn'
+                          ORDER BY changed_at DESC LIMIT 1",
+                        ("@id", appId));
+
+                    string withdrawReason = (withdrawRemarks == null || withdrawRemarks == DBNull.Value)
+                        ? "No reason provided."
+                        : withdrawRemarks.ToString();
+
+                    Panel withdrawBanner = new Panel
+                    {
+                        Left = 28,
+                        Top = top,
+                        Width = p.Width - 56,
+                        Height = 52,
+                        BackColor = Color.FromArgb(45, 22, 22),
+                        Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                    };
+                    withdrawBanner.Paint += (s, e) =>
+                    {
+                        Pen pen = new Pen(Color.FromArgb(100, 40, 40), 1);
+                        e.Graphics.DrawRectangle(pen, 0, 0, withdrawBanner.Width - 1, withdrawBanner.Height - 1);
+                        pen.Dispose();
+                    };
+                    withdrawBanner.Controls.Add(new Label
+                    {
+                        Text = "🚫  Withdrawn",
+                        Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+                        ForeColor = Color.FromArgb(220, 100, 100),
+                        Left = 12,
+                        Top = 6,
+                        AutoSize = true,
+                        BackColor = Color.Transparent
+                    });
+                    withdrawBanner.Controls.Add(new Label
+                    {
+                        Text = "Reason: " + withdrawReason,
+                        Font = new Font("Segoe UI", 8.5f),
+                        ForeColor = Color.FromArgb(200, 160, 160),
+                        Left = 12,
+                        Top = 26,
+                        Width = p.Width - 90,
+                        AutoSize = false,
+                        BackColor = Color.Transparent
+                    });
+                    appContent.Controls.Add(withdrawBanner);
+                    top += 62;
+                }
+                else if (!isEditable)
+                {
+                    Panel lockBanner = new Panel
+                    {
+                        Left = 28,
+                        Top = top,
+                        Width = p.Width - 56,
+                        Height = 34,
+                        BackColor = Color.FromArgb(45, 38, 22),
+                        Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                    };
+                    lockBanner.Paint += (s, e) =>
+                    {
+                        Pen pen = new Pen(Color.FromArgb(80, 60, 20), 1);
+                        e.Graphics.DrawRectangle(pen, 0, 0, lockBanner.Width - 1, lockBanner.Height - 1);
+                        pen.Dispose();
+                    };
+                    lockBanner.Controls.Add(new Label
+                    {
+                        Text = "🔒  Locked — Status: " + status,
+                        Font = new Font("Segoe UI", 8.5f),
+                        ForeColor = Color.FromArgb(220, 160, 60),
+                        Left = 12,
+                        Height = 34,
+                        Width = 500,
+                        TextAlign = ContentAlignment.MiddleLeft,
+                        BackColor = Color.Transparent
+                    });
                     appContent.Controls.Add(lockBanner);
                     top += 42;
                 }
@@ -262,19 +357,62 @@ namespace HRApplicant
                         if (string.IsNullOrWhiteSpace(txtCover.Text))
                         { MessageBox.Show("Cover Letter / Remarks is required.", "Required Field", MessageBoxButtons.OK, MessageBoxIcon.Warning); txtCover.Focus(); return; }
 
-                        // ── CV check ──────────────────────────────────
-                        object cvStatus = db.Scalar(
-                            @"SELECT ad.status FROM applicant_documents ad
+                        // ── ✅ CHECK ALL REQUIRED DOCUMENTS ──────────────────────────────────
+                        DataTable requiredDocs = db.Query(
+                            @"SELECT ad.id, rt.name, ad.status
+                              FROM applicant_documents ad
                               JOIN requirement_types rt ON rt.id = ad.requirement_type_id
-                              WHERE ad.application_id = @aid AND rt.name = 'Resume / CV'
-                              LIMIT 1",
+                              WHERE ad.application_id = @aid
+                              ORDER BY rt.name",
                             ("@aid", appId));
 
-                        if (cvStatus == null || cvStatus == DBNull.Value || cvStatus.ToString() == "Missing")
+                        if (requiredDocs.Rows.Count == 0)
                         {
                             MessageBox.Show(
-                                "Cannot submit — Resume / CV is required.\n\nPlease upload your CV first in the My Documents page.",
-                                "CV Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                "No documents required for this position.",
+                                "No Documents", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+
+                        // Check if all documents are submitted or validated
+                        List<string> missingDocs = new List<string>();
+                        List<string> rejectedDocs = new List<string>();
+
+                        foreach (DataRow docRow in requiredDocs.Rows)
+                        {
+                            string docName = docRow["name"].ToString();
+                            string docStatus = docRow["status"].ToString();
+
+                            if (docStatus == "Missing")
+                                missingDocs.Add(docName);
+                            else if (docStatus == "Rejected")
+                                rejectedDocs.Add(docName);
+                        }
+
+                        // Show error if any documents are missing or rejected
+                        if (missingDocs.Count > 0 || rejectedDocs.Count > 0)
+                        {
+                            string errorMsg = "Cannot submit application.\n\n";
+
+                            if (missingDocs.Count > 0)
+                            {
+                                errorMsg += "Missing Documents:\n";
+                                foreach (string doc in missingDocs)
+                                    errorMsg += "  • " + doc + "\n";
+                                errorMsg += "\n";
+                            }
+
+                            if (rejectedDocs.Count > 0)
+                            {
+                                errorMsg += "Rejected Documents (Re-upload Required):\n";
+                                foreach (string doc in rejectedDocs)
+                                    errorMsg += "  • " + doc + "\n";
+                                errorMsg += "\n";
+                            }
+
+                            errorMsg += "Please complete all documents in the My Documents page before submitting.";
+
+                            MessageBox.Show(errorMsg, "Incomplete Documents", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                             return;
                         }
 
@@ -301,23 +439,114 @@ namespace HRApplicant
                         catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
                     };
 
+                    // ✅ Withdraw asks for a reason before withdrawing
                     Button btnWithdraw = MakeBtn("Withdraw", Color.FromArgb(70, 30, 30), top, 312);
                     btnWithdraw.ForeColor = Color.FromArgb(220, 130, 130);
                     btnWithdraw.Click += (s, e) =>
                     {
-                        var r = MessageBox.Show("Withdraw this application?\nThis cannot be undone.", "Withdraw", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
-                        if (r != DialogResult.Yes) return;
-                        try
+                        // Show withdrawal reason dialog
+                        using (Form withdrawDialog = new Form())
                         {
-                            db.Execute("UPDATE applications SET status='Withdrawn' WHERE id=@id", ("@id", appId));
-                            db.Execute(
-                                "INSERT INTO application_status_history (application_id, status, remarks, changed_by) VALUES (@id,'Withdrawn','Applicant withdrew.',@who)",
-                                ("@id", appId), ("@who", project.Session.ApplicantName));
-                            Audit.Log("Withdrew application", "applications", appId);
-                            MessageBox.Show("Application withdrawn.", "Done", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                            new ApplicantMyApplicationPage(mainForm);
+                            withdrawDialog.Text = "Withdraw Application";
+                            withdrawDialog.Size = new Size(420, 240);
+                            withdrawDialog.BackColor = Color.FromArgb(22, 28, 24);
+                            withdrawDialog.StartPosition = FormStartPosition.CenterParent;
+                            withdrawDialog.FormBorderStyle = FormBorderStyle.FixedDialog;
+                            withdrawDialog.MaximizeBox = false;
+                            withdrawDialog.MinimizeBox = false;
+
+                            withdrawDialog.Controls.Add(new Label
+                            {
+                                Text = "Reason for withdrawing: *",
+                                ForeColor = Color.FromArgb(200, 218, 208),
+                                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                                Left = 16,
+                                Top = 16,
+                                AutoSize = true
+                            });
+
+                            TextBox txtReason = new TextBox
+                            {
+                                Left = 16,
+                                Top = 40,
+                                Width = 370,
+                                Height = 80,
+                                Multiline = true,
+                                BackColor = Color.FromArgb(28, 35, 30),
+                                ForeColor = Color.White,
+                                BorderStyle = BorderStyle.FixedSingle,
+                                Font = new Font("Segoe UI", 9f)
+                            };
+                            withdrawDialog.Controls.Add(txtReason);
+
+                            withdrawDialog.Controls.Add(new Label
+                            {
+                                Text = "⚠️ This action cannot be undone.",
+                                ForeColor = Color.FromArgb(220, 100, 100),
+                                Font = new Font("Segoe UI", 8f),
+                                Left = 16,
+                                Top = 130,
+                                AutoSize = true
+                            });
+
+                            Button btnConfirm = new Button
+                            {
+                                Text = "Confirm Withdraw",
+                                Left = 16,
+                                Top = 156,
+                                Width = 160,
+                                Height = 32,
+                                BackColor = Color.FromArgb(120, 30, 30),
+                                ForeColor = Color.White,
+                                FlatStyle = FlatStyle.Flat,
+                                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                                Cursor = Cursors.Hand
+                            };
+                            btnConfirm.FlatAppearance.BorderSize = 0;
+                            btnConfirm.Click += (s2, e2) =>
+                            {
+                                string reason = txtReason.Text.Trim();
+                                if (string.IsNullOrWhiteSpace(reason))
+                                {
+                                    MessageBox.Show("Please enter a reason for withdrawing.", "Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                    return;
+                                }
+
+                                try
+                                {
+                                    db.Execute("UPDATE applications SET status='Withdrawn' WHERE id=@id", ("@id", appId));
+                                    // ✅ Save the reason in status history remarks
+                                    db.Execute(
+                                        "INSERT INTO application_status_history (application_id, status, remarks, changed_by) VALUES (@id,'Withdrawn',@reason,@who)",
+                                        ("@id", appId),
+                                        ("@reason", reason),
+                                        ("@who", project.Session.ApplicantName));
+                                    Audit.Log("Withdrew application", "applications", appId);
+                                    MessageBox.Show("Application withdrawn.", "Done", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    withdrawDialog.Close();
+                                    new ApplicantMyApplicationPage(mainForm);
+                                }
+                                catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
+                            };
+                            withdrawDialog.Controls.Add(btnConfirm);
+
+                            Button btnCancelW = new Button
+                            {
+                                Text = "Cancel",
+                                Left = 186,
+                                Top = 156,
+                                Width = 200,
+                                Height = 32,
+                                BackColor = Color.FromArgb(60, 60, 60),
+                                ForeColor = Color.White,
+                                FlatStyle = FlatStyle.Flat,
+                                DialogResult = DialogResult.Cancel
+                            };
+                            btnCancelW.FlatAppearance.BorderSize = 0;
+                            withdrawDialog.Controls.Add(btnCancelW);
+
+                            withdrawDialog.ShowDialog();
                         }
-                        catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
                     };
 
                     appContent.Controls.Add(btnSave);
@@ -349,19 +578,14 @@ namespace HRApplicant
         private void InitializeComponent()
         {
             SuspendLayout();
-            // 
-            // ApplicantStatusTrackingPage
-            // 
             ClientSize = new Size(284, 261);
             Name = "ApplicantMyApplicationPage";
             Load += ApplicantMyApplicationPage_Load;
             ResumeLayout(false);
-
         }
 
         private void ApplicantMyApplicationPage_Load(object sender, EventArgs e)
         {
-
         }
     }
 }

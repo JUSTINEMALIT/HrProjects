@@ -16,6 +16,7 @@ namespace HRApplicant
         private static readonly Color BgPage = Color.FromArgb(13, 15, 18);
         private static readonly Color BgCard = Color.FromArgb(20, 24, 28);
         private static readonly Color BgField = Color.FromArgb(16, 20, 24);
+        private static readonly Color BgFieldLocked = Color.FromArgb(20, 22, 24);
         private static readonly Color BorderSubtle = Color.FromArgb(32, 40, 48);
         private static readonly Color BorderFocus = Color.FromArgb(56, 149, 255);
         private static readonly Color TextPrimary = Color.FromArgb(228, 234, 240);
@@ -23,6 +24,8 @@ namespace HRApplicant
         private static readonly Color TextMuted = Color.FromArgb(52, 68, 80);
         private static readonly Color AccentGreen = Color.FromArgb(52, 211, 153);
         private static readonly Color AccentBlue = Color.FromArgb(56, 149, 255);
+        private static readonly Color AccentRed = Color.FromArgb(239, 68, 68);
+        private static readonly Color AccentOrange = Color.FromArgb(245, 158, 11);
 
         public ApplicantProfilePage(ApplicantMainForm main)
         {
@@ -44,6 +47,34 @@ namespace HRApplicant
             p.AutoScroll = true;
 
             p.SuspendLayout();
+
+            // ── Check if profile is locked (any active application under review or beyond) ──
+            // ✅ Editable only when all applications are Draft or Submitted
+            // ✅ Locked when any application is Under Review, Shortlisted, For Interview,
+            //    For Final Review, Accepted — basically anything past Submitted
+            object lockedCheck = db.Scalar(
+                @"SELECT COUNT(*) FROM applications
+                  WHERE applicant_id = @aid
+                    AND status NOT IN ('Draft', 'Submitted', 'Withdrawn', 'Rejected')",
+                ("@aid", project.Session.ApplicantId));
+
+            bool isLocked = lockedCheck != null && Convert.ToInt32(lockedCheck) > 0;
+
+            // Get the current locking status name for the banner message
+            string lockingStatus = "";
+            if (isLocked)
+            {
+                object statusObj = db.Scalar(
+                    @"SELECT status FROM applications
+                      WHERE applicant_id = @aid
+                        AND status NOT IN ('Draft', 'Submitted', 'Withdrawn', 'Rejected')
+                      ORDER BY FIELD(status,
+                        'Accepted','For Final Review','For Interview',
+                        'For Assessment','Shortlisted','Under Review')
+                      LIMIT 1",
+                    ("@aid", project.Session.ApplicantId));
+                lockingStatus = statusObj?.ToString() ?? "Under Review";
+            }
 
             // ── Load existing data ─────────────────────────────────────
             DataTable baseRow = db.Query(
@@ -99,9 +130,12 @@ namespace HRApplicant
             });
             header.Controls.Add(new Label
             {
-                Text = "You can edit your profile details at any time.",
+                // ✅ Subtitle changes depending on lock state
+                Text = isLocked
+                    ? "Your profile is locked while your application is being reviewed."
+                    : "You can edit your profile details at any time.",
                 Font = new Font("Segoe UI", 9f),
-                ForeColor = TextSecondary,
+                ForeColor = isLocked ? AccentOrange : TextSecondary,
                 Left = 33,
                 Top = 42,
                 AutoSize = true,
@@ -110,6 +144,48 @@ namespace HRApplicant
             });
             p.Controls.Add(header);
             top += 82;
+
+            // ✅ LOCK BANNER — shown when profile editing is disabled
+            if (isLocked)
+            {
+                Panel lockBanner = new Panel
+                {
+                    Left = 32,
+                    Top = top,
+                    Width = p.Width - 64,
+                    Height = 56,
+                    BackColor = Color.FromArgb(30, 25, 14),
+                    Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                };
+                lockBanner.Paint += (s, e) =>
+                {
+                    using (Pen pen = new Pen(Color.FromArgb(120, 80, 20), 1))
+                        e.Graphics.DrawRectangle(pen, 0, 0, lockBanner.Width - 1, lockBanner.Height - 1);
+                };
+                lockBanner.Controls.Add(new Label
+                {
+                    Text = "🔒  Profile Editing Locked",
+                    Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold),
+                    ForeColor = AccentOrange,
+                    Left = 16,
+                    Top = 8,
+                    AutoSize = true,
+                    BackColor = Color.Transparent
+                });
+                lockBanner.Controls.Add(new Label
+                {
+                    Text = $"Your application is currently \"{lockingStatus}\". Profile editing is disabled while HR is reviewing your application.",
+                    Font = new Font("Segoe UI", 8.5f),
+                    ForeColor = Color.FromArgb(180, 140, 80),
+                    Left = 16,
+                    Top = 30,
+                    Width = p.Width - 110,
+                    AutoSize = false,
+                    BackColor = Color.Transparent
+                });
+                p.Controls.Add(lockBanner);
+                top += 68;
+            }
 
             // ── Avatar Block ───────────────────────────────────────────
             Panel avatar = new Panel
@@ -147,7 +223,7 @@ namespace HRApplicant
                     e.Graphics.DrawString(initials, f, tb, ix, iy);
                 }
 
-                using (var br = new SolidBrush(AccentGreen))
+                using (var br = new SolidBrush(isLocked ? AccentOrange : AccentGreen))
                     e.Graphics.FillRectangle(br, 0, 20, 3, 48);
             };
 
@@ -173,6 +249,22 @@ namespace HRApplicant
                 BackColor = Color.Transparent,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left
             });
+
+            // ✅ Show lock badge on avatar when locked
+            if (isLocked)
+            {
+                avatar.Controls.Add(new Label
+                {
+                    Text = "🔒 Read-only",
+                    Font = new Font("Segoe UI", 8f),
+                    ForeColor = AccentOrange,
+                    Left = 93,
+                    Top = 62,
+                    AutoSize = true,
+                    BackColor = Color.Transparent
+                });
+            }
+
             p.Controls.Add(avatar);
             top += 100;
 
@@ -183,135 +275,154 @@ namespace HRApplicant
             TextBox txtSkills;
             TextBox txtCompany, txtPosition, txtDuration, txtResponsibilities;
 
+            // ✅ Pass isLocked to AddSection so all fields are ReadOnly when locked
             top = AddSection(p, "Personal Information", top,
                 new[] { "First Name", "Middle Name", "Last Name", "Date of Birth (YYYY-MM-DD)", "Gender", "Civil Status", "Nationality" },
                 new[] { Get(b, "first_name"), Get(pr, "middle_name"), Get(b, "last_name"), Get(b, "date_of_birth"), Get(pr, "gender"), Get(pr, "civil_status"), Get(pr, "nationality") },
-                out TextBox[] personalTxt);
+                isLocked, out TextBox[] personalTxt);
             txtFirst = personalTxt[0]; txtMiddle = personalTxt[1]; txtLast = personalTxt[2];
             txtDob = personalTxt[3]; txtGender = personalTxt[4]; txtCivil = personalTxt[5]; txtNat = personalTxt[6];
 
             top = AddSection(p, "Contact & Address", top,
                 new[] { "Email Address", "Mobile Number", "Province", "City / Municipality", "Barangay", "Street / Unit", "Zip Code" },
                 new[] { Get(b, "email"), Get(b, "mobile_number"), Get(pr, "province"), Get(pr, "city"), Get(pr, "barangay"), Get(pr, "street"), Get(pr, "zip_code") },
-                out TextBox[] contactTxt);
+                isLocked, out TextBox[] contactTxt);
             txtEmail = contactTxt[0]; txtMobile = contactTxt[1]; txtProvince = contactTxt[2]; txtCity = contactTxt[3];
             txtBrgy = contactTxt[4]; txtStreet = contactTxt[5]; txtZip = contactTxt[6];
 
             top = AddSection(p, "Educational Background", top,
                 new[] { "Highest Degree", "School / University", "Course / Program", "Year Graduated" },
                 new[] { Get(pr, "highest_degree"), Get(pr, "school"), Get(pr, "course"), Get(pr, "year_graduated") },
-                out TextBox[] eduTxt);
+                isLocked, out TextBox[] eduTxt);
             txtDegree = eduTxt[0]; txtSchool = eduTxt[1]; txtCourse = eduTxt[2]; txtYearGrad = eduTxt[3];
 
             top = AddSection(p, "Skills", top,
                 new[] { "Skills (comma-separated)" },
                 new[] { Get(pr, "skills") },
-                out TextBox[] skillTxt);
+                isLocked, out TextBox[] skillTxt);
             txtSkills = skillTxt[0];
 
             top = AddSection(p, "Work Experience (Most Recent)", top,
                 new[] { "Company", "Position", "Duration", "Responsibilities" },
                 new[] { Get(pr, "work_company"), Get(pr, "work_position"), Get(pr, "work_duration"), Get(pr, "work_responsibilities") },
-                out TextBox[] workTxt);
+                isLocked, out TextBox[] workTxt);
             txtCompany = workTxt[0]; txtPosition = workTxt[1]; txtDuration = workTxt[2]; txtResponsibilities = workTxt[3];
 
-            // ── Save Button ────────────────────────────────────────────
-            Button btnSave = new Button
+            // ── Save Button — hidden when locked ───────────────────────
+            if (!isLocked)
             {
-                Text = "Save Changes",
-                Left = 32,
-                Top = top + 14,
-                Width = 148,
-                Height = 38,
-                BackColor = Color.FromArgb(30, 100, 65),
-                ForeColor = Color.FromArgb(52, 211, 153),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold),
-                Cursor = Cursors.Hand,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left
-            };
-            btnSave.FlatAppearance.BorderColor = Color.FromArgb(40, 130, 80);
-            btnSave.FlatAppearance.BorderSize = 1;
-            btnSave.MouseEnter += (s, e) => { btnSave.BackColor = Color.FromArgb(40, 130, 80); };
-            btnSave.MouseLeave += (s, e) => { btnSave.BackColor = Color.FromArgb(30, 100, 65); };
-
-            btnSave.Click += (s, e) =>
-            {
-                try
+                Button btnSave = new Button
                 {
-                    db.Execute(
-                        "UPDATE applicants SET first_name=@fn, last_name=@ln, mobile_number=@mn, date_of_birth=@dob WHERE id=@id",
-                        ("@fn", txtFirst.Text.Trim()), ("@ln", txtLast.Text.Trim()),
-                        ("@mn", txtMobile.Text.Trim()),
-                        ("@dob", string.IsNullOrWhiteSpace(txtDob.Text) ? (object)DBNull.Value :
-                            DateTime.TryParseExact(txtDob.Text.Trim(), "yyyy-MM-dd",
-                            System.Globalization.CultureInfo.InvariantCulture,
-                            System.Globalization.DateTimeStyles.None, out DateTime dob)
-                            ? (object)dob.ToString("yyyy-MM-dd") : (object)DBNull.Value),
-                        ("@id", project.Session.ApplicantId));
+                    Text = "Save Changes",
+                    Left = 32,
+                    Top = top + 14,
+                    Width = 148,
+                    Height = 38,
+                    BackColor = Color.FromArgb(30, 100, 65),
+                    ForeColor = Color.FromArgb(52, 211, 153),
+                    FlatStyle = FlatStyle.Flat,
+                    Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold),
+                    Cursor = Cursors.Hand,
+                    Anchor = AnchorStyles.Top | AnchorStyles.Left
+                };
+                btnSave.FlatAppearance.BorderColor = Color.FromArgb(40, 130, 80);
+                btnSave.FlatAppearance.BorderSize = 1;
+                btnSave.MouseEnter += (s, e) => { btnSave.BackColor = Color.FromArgb(40, 130, 80); };
+                btnSave.MouseLeave += (s, e) => { btnSave.BackColor = Color.FromArgb(30, 100, 65); };
 
-                    bool exists = Convert.ToInt32(db.Scalar(
-                        "SELECT COUNT(*) FROM applicant_profiles WHERE applicant_id=@aid",
-                        ("@aid", project.Session.ApplicantId))) > 0;
-
-                    if (exists)
+                btnSave.Click += (s, e) =>
+                {
+                    try
                     {
                         db.Execute(
-                            @"UPDATE applicant_profiles SET middle_name=@mn, gender=@gn, civil_status=@cs, nationality=@nat,
-                              province=@prov, city=@city, barangay=@brgy, street=@st, zip_code=@zip,
-                              highest_degree=@deg, school=@sch, course=@crs, year_graduated=@yr,
-                              skills=@sk, work_company=@wc, work_position=@wp, work_duration=@wd, work_responsibilities=@wr
-                              WHERE applicant_id=@aid",
-                            ("@mn", txtMiddle.Text.Trim()), ("@gn", txtGender.Text.Trim()),
-                            ("@cs", txtCivil.Text.Trim()), ("@nat", txtNat.Text.Trim()),
-                            ("@prov", txtProvince.Text.Trim()), ("@city", txtCity.Text.Trim()),
-                            ("@brgy", txtBrgy.Text.Trim()), ("@st", txtStreet.Text.Trim()),
-                            ("@zip", txtZip.Text.Trim()), ("@deg", txtDegree.Text.Trim()),
-                            ("@sch", txtSchool.Text.Trim()), ("@crs", txtCourse.Text.Trim()),
-                            ("@yr", string.IsNullOrWhiteSpace(txtYearGrad.Text) ? (object)DBNull.Value : txtYearGrad.Text.Trim()),
-                            ("@sk", txtSkills.Text.Trim()), ("@wc", txtCompany.Text.Trim()),
-                            ("@wp", txtPosition.Text.Trim()), ("@wd", txtDuration.Text.Trim()),
-                            ("@wr", txtResponsibilities.Text.Trim()),
-                            ("@aid", project.Session.ApplicantId));
-                    }
-                    else
-                    {
-                        db.Execute(
-                            @"INSERT INTO applicant_profiles (applicant_id, middle_name, gender, civil_status, nationality,
-                              province, city, barangay, street, zip_code, highest_degree, school, course, year_graduated,
-                              skills, work_company, work_position, work_duration, work_responsibilities)
-                              VALUES (@aid,@mn,@gn,@cs,@nat,@prov,@city,@brgy,@st,@zip,@deg,@sch,@crs,@yr,@sk,@wc,@wp,@wd,@wr)",
-                            ("@aid", project.Session.ApplicantId),
-                            ("@mn", txtMiddle.Text.Trim()), ("@gn", txtGender.Text.Trim()),
-                            ("@cs", txtCivil.Text.Trim()), ("@nat", txtNat.Text.Trim()),
-                            ("@prov", txtProvince.Text.Trim()), ("@city", txtCity.Text.Trim()),
-                            ("@brgy", txtBrgy.Text.Trim()), ("@st", txtStreet.Text.Trim()),
-                            ("@zip", txtZip.Text.Trim()), ("@deg", txtDegree.Text.Trim()),
-                            ("@sch", txtSchool.Text.Trim()), ("@crs", txtCourse.Text.Trim()),
-                            ("@yr", string.IsNullOrWhiteSpace(txtYearGrad.Text) ? (object)DBNull.Value : txtYearGrad.Text.Trim()),
-                            ("@sk", txtSkills.Text.Trim()), ("@wc", txtCompany.Text.Trim()),
-                            ("@wp", txtPosition.Text.Trim()), ("@wd", txtDuration.Text.Trim()),
-                            ("@wr", txtResponsibilities.Text.Trim()));
-                    }
+                            "UPDATE applicants SET first_name=@fn, last_name=@ln, mobile_number=@mn, date_of_birth=@dob WHERE id=@id",
+                            ("@fn", txtFirst.Text.Trim()), ("@ln", txtLast.Text.Trim()),
+                            ("@mn", txtMobile.Text.Trim()),
+                            ("@dob", string.IsNullOrWhiteSpace(txtDob.Text) ? (object)DBNull.Value :
+                                DateTime.TryParseExact(txtDob.Text.Trim(), "yyyy-MM-dd",
+                                System.Globalization.CultureInfo.InvariantCulture,
+                                System.Globalization.DateTimeStyles.None, out DateTime dob)
+                                ? (object)dob.ToString("yyyy-MM-dd") : (object)DBNull.Value),
+                            ("@id", project.Session.ApplicantId));
 
-                    project.Session.ApplicantName = txtFirst.Text.Trim() + " " + txtLast.Text.Trim();
-                    Audit.Log("Updated profile");
-                    MessageBox.Show("Profile saved successfully.", "Saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                catch (Exception ex)
+                        bool exists = Convert.ToInt32(db.Scalar(
+                            "SELECT COUNT(*) FROM applicant_profiles WHERE applicant_id=@aid",
+                            ("@aid", project.Session.ApplicantId))) > 0;
+
+                        if (exists)
+                        {
+                            db.Execute(
+                                @"UPDATE applicant_profiles SET middle_name=@mn, gender=@gn, civil_status=@cs, nationality=@nat,
+                                  province=@prov, city=@city, barangay=@brgy, street=@st, zip_code=@zip,
+                                  highest_degree=@deg, school=@sch, course=@crs, year_graduated=@yr,
+                                  skills=@sk, work_company=@wc, work_position=@wp, work_duration=@wd, work_responsibilities=@wr
+                                  WHERE applicant_id=@aid",
+                                ("@mn", txtMiddle.Text.Trim()), ("@gn", txtGender.Text.Trim()),
+                                ("@cs", txtCivil.Text.Trim()), ("@nat", txtNat.Text.Trim()),
+                                ("@prov", txtProvince.Text.Trim()), ("@city", txtCity.Text.Trim()),
+                                ("@brgy", txtBrgy.Text.Trim()), ("@st", txtStreet.Text.Trim()),
+                                ("@zip", txtZip.Text.Trim()), ("@deg", txtDegree.Text.Trim()),
+                                ("@sch", txtSchool.Text.Trim()), ("@crs", txtCourse.Text.Trim()),
+                                ("@yr", string.IsNullOrWhiteSpace(txtYearGrad.Text) ? (object)DBNull.Value : txtYearGrad.Text.Trim()),
+                                ("@sk", txtSkills.Text.Trim()), ("@wc", txtCompany.Text.Trim()),
+                                ("@wp", txtPosition.Text.Trim()), ("@wd", txtDuration.Text.Trim()),
+                                ("@wr", txtResponsibilities.Text.Trim()),
+                                ("@aid", project.Session.ApplicantId));
+                        }
+                        else
+                        {
+                            db.Execute(
+                                @"INSERT INTO applicant_profiles (applicant_id, middle_name, gender, civil_status, nationality,
+                                  province, city, barangay, street, zip_code, highest_degree, school, course, year_graduated,
+                                  skills, work_company, work_position, work_duration, work_responsibilities)
+                                  VALUES (@aid,@mn,@gn,@cs,@nat,@prov,@city,@brgy,@st,@zip,@deg,@sch,@crs,@yr,@sk,@wc,@wp,@wd,@wr)",
+                                ("@aid", project.Session.ApplicantId),
+                                ("@mn", txtMiddle.Text.Trim()), ("@gn", txtGender.Text.Trim()),
+                                ("@cs", txtCivil.Text.Trim()), ("@nat", txtNat.Text.Trim()),
+                                ("@prov", txtProvince.Text.Trim()), ("@city", txtCity.Text.Trim()),
+                                ("@brgy", txtBrgy.Text.Trim()), ("@st", txtStreet.Text.Trim()),
+                                ("@zip", txtZip.Text.Trim()), ("@deg", txtDegree.Text.Trim()),
+                                ("@sch", txtSchool.Text.Trim()), ("@crs", txtCourse.Text.Trim()),
+                                ("@yr", string.IsNullOrWhiteSpace(txtYearGrad.Text) ? (object)DBNull.Value : txtYearGrad.Text.Trim()),
+                                ("@sk", txtSkills.Text.Trim()), ("@wc", txtCompany.Text.Trim()),
+                                ("@wp", txtPosition.Text.Trim()), ("@wd", txtDuration.Text.Trim()),
+                                ("@wr", txtResponsibilities.Text.Trim()));
+                        }
+
+                        project.Session.ApplicantName = txtFirst.Text.Trim() + " " + txtLast.Text.Trim();
+                        Audit.Log("Updated profile");
+                        MessageBox.Show("Profile saved successfully.", "Saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Error saving profile:\n" + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                };
+                p.Controls.Add(btnSave);
+            }
+            else
+            {
+                // ✅ Show a disabled-looking label instead of the save button when locked
+                Label lblLocked = new Label
                 {
-                    MessageBox.Show("Error saving profile:\n" + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            };
-            p.Controls.Add(btnSave);
+                    Text = "🔒  Editing disabled — application is under HR review.",
+                    Font = new Font("Segoe UI", 8.5f),
+                    ForeColor = Color.FromArgb(100, 80, 40),
+                    Left = 32,
+                    Top = top + 14,
+                    AutoSize = true,
+                    BackColor = Color.Transparent
+                };
+                p.Controls.Add(lblLocked);
+            }
 
             p.ResumeLayout(false);
             p.PerformLayout();
         }
 
-        // ── Section card builder ───────────────────────────────────────
+        // ── Section card builder — now accepts isLocked ────────────────
         private int AddSection(Panel p, string title, int top,
-            string[] labels, string[] values, out TextBox[] boxes)
+            string[] labels, string[] values, bool isLocked, out TextBox[] boxes)
         {
             const int PADDING = 20;
             const int GAP = 16;
@@ -353,9 +464,11 @@ namespace HRApplicant
             card.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                using (var pen = new Pen(Color.FromArgb(32, 40, 48), 1))
+                // ✅ Orange border tint when locked, normal blue when editable
+                Color dotColor = isLocked ? AccentOrange : Color.FromArgb(56, 149, 255);
+                using (var pen = new Pen(isLocked ? Color.FromArgb(50, 40, 20) : Color.FromArgb(32, 40, 48), 1))
                     DrawRoundedRect(e.Graphics, pen, 0, 0, card.Width - 1, card.Height - 1, 8);
-                using (var br = new SolidBrush(Color.FromArgb(56, 149, 255)))
+                using (var br = new SolidBrush(dotColor))
                     e.Graphics.FillEllipse(br, PADDING, 17, 6, 6);
             };
 
@@ -363,7 +476,7 @@ namespace HRApplicant
             {
                 Text = title,
                 Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(56, 149, 255),
+                ForeColor = isLocked ? AccentOrange : Color.FromArgb(56, 149, 255),
                 Left = PADDING + 14,
                 Top = 12,
                 AutoSize = true,
@@ -377,7 +490,7 @@ namespace HRApplicant
                 Top = HEADER_H - 10,
                 Height = 1,
                 Width = card.Width,
-                BackColor = Color.FromArgb(32, 40, 48),
+                BackColor = isLocked ? Color.FromArgb(50, 40, 20) : Color.FromArgb(32, 40, 48),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             card.SizeChanged += (s, e) => divider.Width = card.Width;
@@ -412,7 +525,7 @@ namespace HRApplicant
                     {
                         Text = labels[i],
                         Font = new Font("Segoe UI", 8f),
-                        ForeColor = Color.FromArgb(88, 110, 128),
+                        ForeColor = isLocked ? Color.FromArgb(80, 65, 35) : Color.FromArgb(88, 110, 128),
                         Left = fx,
                         Top = fy,
                         Width = initialColW,
@@ -430,10 +543,13 @@ namespace HRApplicant
                         Width = initialColW,
                         Height = isMulti ? MULTI_H : INPUT_H,
                         Multiline = isMulti,
-                        BackColor = Color.FromArgb(16, 20, 24),
-                        ForeColor = Color.FromArgb(210, 220, 228),
+                        // ✅ ReadOnly when locked, darker background to signal lock
+                        BackColor = isLocked ? Color.FromArgb(18, 20, 22) : Color.FromArgb(16, 20, 24),
+                        ForeColor = isLocked ? Color.FromArgb(120, 130, 120) : Color.FromArgb(210, 220, 228),
                         BorderStyle = BorderStyle.FixedSingle,
                         Font = new Font("Segoe UI", 9.5f),
+                        ReadOnly = isLocked,
+                        Cursor = isLocked ? Cursors.Default : Cursors.IBeam,
                         Anchor = AnchorStyles.Top | AnchorStyles.Left
                     };
 
@@ -524,19 +640,14 @@ namespace HRApplicant
         private void InitializeComponent()
         {
             SuspendLayout();
-            // 
-            // ApplicantStatusTrackingPage
-            // 
             ClientSize = new Size(284, 261);
             Name = "ApplicantProfilePage";
             Load += ApplicantProfilePage_Load;
             ResumeLayout(false);
-
         }
 
         private void ApplicantProfilePage_Load(object sender, EventArgs e)
         {
-
         }
     }
 }

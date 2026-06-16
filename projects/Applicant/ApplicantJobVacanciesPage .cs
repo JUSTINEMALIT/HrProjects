@@ -27,11 +27,44 @@ namespace HRApplicant
             p.Controls.Add(new Label { Text = "Job Vacancies", Font = new Font("Segoe UI", 15f, FontStyle.Bold), ForeColor = Color.FromArgb(220, 235, 228), Left = 28, Top = 18, AutoSize = true, BackColor = Color.Transparent });
             p.Controls.Add(new Label { Text = "Browse open positions and submit your application.", Font = new Font("Segoe UI", 9f), ForeColor = Color.FromArgb(100, 130, 115), Left = 29, Top = 46, AutoSize = true, BackColor = Color.Transparent });
 
+            // ✅ CHECK if applicant already has an ACCEPTED application
+            object acceptedCount = db.Scalar(
+                "SELECT COUNT(*) FROM applications WHERE applicant_id=@aid AND status='Accepted'",
+                ("@aid", project.Session.ApplicantId));
+            bool hasAcceptedJob = acceptedCount != null && Convert.ToInt32(acceptedCount) > 0;
+
+            // Show warning if already accepted
+            if (hasAcceptedJob)
+            {
+                Panel warningPanel = new Panel
+                {
+                    Left = 28,
+                    Top = 70,
+                    Width = 600,
+                    Height = 50,
+                    BackColor = Color.FromArgb(45, 60, 50),
+                    BorderStyle = BorderStyle.FixedSingle
+                };
+                warningPanel.Controls.Add(new Label
+                {
+                    Text = "⚠️ You have an accepted job offer. You cannot apply to other positions.",
+                    Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(255, 180, 100),
+                    Left = 10,
+                    Top = 15,
+                    AutoSize = false,
+                    Width = 580,
+                    Height = 30,
+                    BackColor = Color.Transparent
+                });
+                p.Controls.Add(warningPanel);
+            }
+
             // Search box
             TextBox txtSearch = new TextBox
             {
                 Left = 28,
-                Top = 76,
+                Top = hasAcceptedJob ? 130 : 76,
                 Width = 260,
                 Height = 26,
                 BackColor = Color.FromArgb(26, 33, 28),
@@ -46,7 +79,7 @@ namespace HRApplicant
             ComboBox cmbType = new ComboBox
             {
                 Left = 298,
-                Top = 76,
+                Top = hasAcceptedJob ? 130 : 76,
                 Width = 130,
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 BackColor = Color.FromArgb(26, 33, 28),
@@ -61,7 +94,7 @@ namespace HRApplicant
             ComboBox cmbStatus = new ComboBox
             {
                 Left = 440,
-                Top = 76,
+                Top = hasAcceptedJob ? 130 : 76,
                 Width = 110,
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 BackColor = Color.FromArgb(26, 33, 28),
@@ -76,7 +109,7 @@ namespace HRApplicant
             {
                 Text = "Search",
                 Left = 562,
-                Top = 74,
+                Top = hasAcceptedJob ? 128 : 74,
                 Width = 80,
                 Height = 28,
                 BackColor = Color.FromArgb(28, 80, 52),
@@ -91,9 +124,9 @@ namespace HRApplicant
             Panel listPanel = new Panel
             {
                 Left = 28,
-                Top = 114,
+                Top = hasAcceptedJob ? 168 : 114,
                 Width = p.Width - 56,
-                Height = p.Height - 130,
+                Height = p.Height - (hasAcceptedJob ? 184 : 130),
                 AutoScroll = true,
                 BackColor = Color.Transparent,
                 Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
@@ -155,7 +188,7 @@ namespace HRApplicant
                         row["employment_type"].ToString(), row["slots"].ToString(),
                         row["status"].ToString(), postedAt,
                         row["qualifications"].ToString(),
-                        isOpen, alreadyApplied, listPanel.Width - 4, mainForm);
+                        isOpen, alreadyApplied, hasAcceptedJob, listPanel.Width - 4, mainForm);
 
                     card.Left = 0; card.Top = cardTop;
                     card.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
@@ -169,9 +202,183 @@ namespace HRApplicant
             loadJobs();
         }
 
+        // ✅ NEW: Show job details dialog
+        private void ShowJobDetailsDialog(int jobId, string jobTitle)
+        {
+            var db = new DatabaseConnection();
+
+            // Get job details
+            DataTable jobData = db.Query(
+                "SELECT title, qualifications, employment_type, slots, status FROM job_vacancies WHERE id = @id",
+                ("@id", jobId));
+
+            if (jobData.Rows.Count == 0)
+            {
+                MessageBox.Show("Job not found.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            DataRow jobRow = jobData.Rows[0];
+            string qualifications = jobRow["qualifications"].ToString();
+            string employment = jobRow["employment_type"].ToString();
+            string slots = jobRow["slots"].ToString();
+            string status = jobRow["status"].ToString();
+
+            // Get required documents for this job
+            DataTable requirements = db.Query(
+                @"SELECT rt.name AS document_name
+                  FROM vacancy_requirements vr
+                  JOIN requirement_types rt ON rt.id = vr.requirement_type_id
+                  WHERE vr.job_vacancy_id = @jid
+                  ORDER BY rt.name",
+                ("@jid", jobId));
+
+            // Create dialog
+            Form detailDialog = new Form
+            {
+                Text = "Job Details - " + jobTitle,
+                Width = 600,
+                Height = 550,
+                StartPosition = FormStartPosition.CenterParent,
+                BackColor = Color.FromArgb(26, 33, 28),
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false
+            };
+
+            int y = 20;
+
+            // ========== JOB TITLE ==========
+            detailDialog.Controls.Add(new Label
+            {
+                Text = jobTitle,
+                Font = new Font("Segoe UI", 14f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(220, 235, 228),
+                Left = 20,
+                Top = y,
+                AutoSize = true,
+                BackColor = Color.Transparent
+            });
+            y += 40;
+
+            // ========== JOB INFO ==========
+            detailDialog.Controls.Add(new Label
+            {
+                Text = $"Employment Type: {employment}  •  Available Slots: {slots}  •  Status: {status}",
+                Font = new Font("Segoe UI", 9f),
+                ForeColor = Color.FromArgb(100, 130, 115),
+                Left = 20,
+                Top = y,
+                AutoSize = true,
+                BackColor = Color.Transparent
+            });
+            y += 30;
+
+            // ========== QUALIFICATIONS SECTION ==========
+            detailDialog.Controls.Add(new Label
+            {
+                Text = "Qualifications / Requirements:",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(150, 180, 165),
+                Left = 20,
+                Top = y,
+                AutoSize = true,
+                BackColor = Color.Transparent
+            });
+            y += 28;
+
+            // Qualifications text box
+            TextBox txtQualifications = new TextBox
+            {
+                Text = qualifications,
+                Left = 20,
+                Top = y,
+                Width = 540,
+                Height = 120,
+                Multiline = true,
+                ReadOnly = true,
+                BackColor = Color.FromArgb(22, 28, 24),
+                ForeColor = Color.FromArgb(180, 200, 190),
+                BorderStyle = BorderStyle.FixedSingle,
+                ScrollBars = ScrollBars.Vertical,
+                Font = new Font("Segoe UI", 9f)
+            };
+            detailDialog.Controls.Add(txtQualifications);
+            y += 130;
+
+            // ========== REQUIRED DOCUMENTS SECTION ==========
+            detailDialog.Controls.Add(new Label
+            {
+                Text = "Required Documents:",
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(150, 180, 165),
+                Left = 20,
+                Top = y,
+                AutoSize = true,
+                BackColor = Color.Transparent
+            });
+            y += 28;
+
+            // Required documents list
+            if (requirements.Rows.Count == 0)
+            {
+                detailDialog.Controls.Add(new Label
+                {
+                    Text = "No specific documents required for this position.",
+                    Font = new Font("Segoe UI", 9f),
+                    ForeColor = Color.FromArgb(100, 130, 115),
+                    Left = 20,
+                    Top = y,
+                    AutoSize = true,
+                    BackColor = Color.Transparent
+                });
+                y += 30;
+            }
+            else
+            {
+                int docIndex = 1;
+                foreach (DataRow docRow in requirements.Rows)
+                {
+                    string docName = docRow["document_name"].ToString();
+                    detailDialog.Controls.Add(new Label
+                    {
+                        Text = $"• {docName}",
+                        Font = new Font("Segoe UI", 9f),
+                        ForeColor = Color.FromArgb(180, 200, 190),
+                        Left = 30,
+                        Top = y,
+                        AutoSize = true,
+                        BackColor = Color.Transparent
+                    });
+                    y += 24;
+                    docIndex++;
+                }
+                y += 10;
+            }
+
+            // ========== CLOSE BUTTON ==========
+            Button btnClose = new Button
+            {
+                Text = "Close",
+                Left = 490,
+                Top = y + 20,
+                Width = 70,
+                Height = 32,
+                BackColor = Color.FromArgb(60, 60, 60),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9f),
+                DialogResult = DialogResult.OK
+            };
+            btnClose.FlatAppearance.BorderSize = 0;
+            detailDialog.Controls.Add(btnClose);
+
+            detailDialog.ShowDialog();
+        }
+
         private Panel BuildJobCard(int jobId, string title, string dept, string type,
             string slots, string status, string posted, string qualifications,
-            bool isOpen, bool alreadyApplied, int width, ApplicantMainForm main)
+            bool isOpen, bool alreadyApplied, bool hasAcceptedJob, int width, ApplicantMainForm main)
         {
             Panel card = new Panel { Width = width, Height = 110, BackColor = Color.FromArgb(22, 28, 24) };
             card.Paint += (s, e) =>
@@ -185,7 +392,7 @@ namespace HRApplicant
 
             card.Controls.Add(new Label { Text = title, Font = new Font("Segoe UI", 10.5f, FontStyle.Bold), ForeColor = isOpen ? Color.FromArgb(200, 230, 215) : Color.FromArgb(160, 140, 140), Left = 16, Top = 10, AutoSize = true, BackColor = Color.Transparent });
             card.Controls.Add(new Label { Text = dept + "   •   " + type + "   •   " + slots + " slot(s)   •   Posted: " + posted, Font = new Font("Segoe UI", 8f), ForeColor = Color.FromArgb(110, 130, 120), Left = 16, Top = 34, AutoSize = true, BackColor = Color.Transparent });
-            card.Controls.Add(new Label { Text = qualifications, Font = new Font("Segoe UI", 8f), ForeColor = Color.FromArgb(90, 115, 102), Left = 16, Top = 56, Width = width - 200, Height = 18, AutoSize = false, BackColor = Color.Transparent });
+            card.Controls.Add(new Label { Text = qualifications, Font = new Font("Segoe UI", 8f), ForeColor = Color.FromArgb(90, 115, 102), Left = 16, Top = 56, Width = width - 280, Height = 18, AutoSize = false, BackColor = Color.Transparent });
 
             // Status label
             Label lblSt = new Label
@@ -197,19 +404,63 @@ namespace HRApplicant
                 Width = 64,
                 Height = 22,
                 TextAlign = ContentAlignment.MiddleCenter,
-                Left = card.Width - 148,
+                Left = card.Width - 228,
                 Top = 10,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
             card.Controls.Add(lblSt);
 
-            // Apply button
+            // ✅ VIEW DETAILS BUTTON
+            Button btnDetails = new Button
+            {
+                Text = "Details",
+                Left = card.Width - 228,
+                Top = 38,
+                Width = 80,
+                Height = 30,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                BackColor = Color.FromArgb(25, 55, 80),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9f),
+                Cursor = Cursors.Hand
+            };
+            btnDetails.FlatAppearance.BorderSize = 0;
+            int capturedJobId = jobId;
+            string capturedTitle = title;
+            btnDetails.Click += (s, e) => ShowJobDetailsDialog(capturedJobId, capturedTitle);
+            card.Controls.Add(btnDetails);
+
+            // Apply button logic
             string btnText;
             Color btnBg;
             bool enabled;
-            if (alreadyApplied) { btnText = "Applied"; btnBg = Color.FromArgb(30, 55, 40); enabled = false; }
-            else if (!isOpen) { btnText = "Closed"; btnBg = Color.FromArgb(40, 35, 35); enabled = false; }
-            else { btnText = "Apply"; btnBg = Color.FromArgb(30, 100, 60); enabled = true; }
+
+            // ✅ DISABLE if: already applied OR job closed OR already has accepted job
+            if (hasAcceptedJob)
+            {
+                btnText = "Unavailable";
+                btnBg = Color.FromArgb(40, 35, 35);
+                enabled = false;
+            }
+            else if (alreadyApplied)
+            {
+                btnText = "Applied";
+                btnBg = Color.FromArgb(30, 55, 40);
+                enabled = false;
+            }
+            else if (!isOpen)
+            {
+                btnText = "Closed";
+                btnBg = Color.FromArgb(40, 35, 35);
+                enabled = false;
+            }
+            else
+            {
+                btnText = "Apply";
+                btnBg = Color.FromArgb(30, 100, 60);
+                enabled = true;
+            }
 
             Button btnApply = new Button
             {
@@ -230,13 +481,13 @@ namespace HRApplicant
 
             if (enabled)
             {
-                int capturedJobId = jobId;
-                string capturedTitle = title;
+                int capturedJobIdForApply = jobId;
+                string capturedTitleForApply = title;
                 btnApply.Click += (s, e) =>
                 {
                     var db = new DatabaseConnection();
                     var result = MessageBox.Show(
-                        "Apply for \"" + capturedTitle + "\"?\n\nThis will create a new Draft application.",
+                        "Apply for \"" + capturedTitleForApply + "\"?\n\nThis will create a new Draft application.",
                         "Confirm Application", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                     if (result != DialogResult.Yes) return;
                     try
@@ -244,7 +495,7 @@ namespace HRApplicant
                         // Business rule: no duplicate application
                         object dup = db.Scalar(
                             "SELECT COUNT(*) FROM applications WHERE applicant_id=@aid AND job_vacancy_id=@jid",
-                            ("@aid", project.Session.ApplicantId), ("@jid", capturedJobId));
+                            ("@aid", project.Session.ApplicantId), ("@jid", capturedJobIdForApply));
                         if (Convert.ToInt32(dup) > 0)
                         {
                             MessageBox.Show("You already applied for this position.", "Duplicate", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -252,7 +503,7 @@ namespace HRApplicant
                         }
 
                         // Business rule: job must be open
-                        object openCheck = db.Scalar("SELECT status FROM job_vacancies WHERE id=@jid", ("@jid", capturedJobId));
+                        object openCheck = db.Scalar("SELECT status FROM job_vacancies WHERE id=@jid", ("@jid", capturedJobIdForApply));
                         if (openCheck.ToString() != "Open")
                         {
                             MessageBox.Show("This job vacancy is no longer open.", "Closed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -261,23 +512,27 @@ namespace HRApplicant
 
                         int newAppId = db.InsertGetId(
                             "INSERT INTO applications (applicant_id, job_vacancy_id, status) VALUES (@aid,@jid,'Draft')",
-                            ("@aid", project.Session.ApplicantId), ("@jid", capturedJobId));
+                            ("@aid", project.Session.ApplicantId), ("@jid", capturedJobIdForApply));
 
                         // Initial status history
                         db.Execute(
                             "INSERT INTO application_status_history (application_id, status, remarks, changed_by) VALUES (@id,'Draft','Application created.',@who)",
                             ("@id", newAppId), ("@who", project.Session.FullName));
 
-                        // Auto-create document slots for required types
-                        DataTable reqTypes = db.Query("SELECT id FROM requirement_types WHERE is_active=1");
+                        // ✅ UPDATED: Auto-create document slots ONLY for required types of this job
+                        DataTable reqTypes = db.Query(
+                            @"SELECT requirement_type_id FROM vacancy_requirements 
+                              WHERE job_vacancy_id = @jid",
+                            ("@jid", capturedJobIdForApply));
+
                         foreach (DataRow rt in reqTypes.Rows)
                         {
                             db.Execute(
                                 "INSERT INTO applicant_documents (application_id, requirement_type_id, status) VALUES (@aid,@rid,'Missing')",
-                                ("@aid", newAppId), ("@rid", Convert.ToInt32(rt["id"])));
+                                ("@aid", newAppId), ("@rid", Convert.ToInt32(rt["requirement_type_id"])));
                         }
 
-                        Audit.Log("Applied for job: " + capturedTitle, "applications", newAppId);
+                        Audit.Log("Applied for job: " + capturedTitleForApply, "applications", newAppId);
                         MessageBox.Show("Application created! Status: Draft.\nGo to My Application to fill in details.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         new ApplicantJobVacanciesPage(main); // refresh
                     }

@@ -14,7 +14,7 @@ namespace HRApplicant
         private static readonly string[] AllStatuses =
         {
             "Draft","Submitted","Under Review","Shortlisted",
-            "For Interview","For Assessment","For Final Review","Accepted"
+            "For Interview","Assessment","For Final Review","Accepted"
         };
 
         private static readonly Color[] StepColors =
