@@ -9,43 +9,43 @@ namespace ApplicantPortal
     {
         public RegisterForm()
         {
-            // FORM
-            this.Text = "Create Applicant Account";
+            // FORM
+            this.Text = "Create Applicant Account";
             this.ClientSize = new Size(520, 520);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.BackColor = Color.FromArgb(24, 24, 24);
+            this.BackColor = Color.FromArgb(15, 19, 26);
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
 
-            // TITLE
-            Label title = new Label();
+            // TITLE
+            Label title = new Label();
             title.Text = "Create Applicant Account";
             title.ForeColor = Color.White;
             title.Font = new Font("Segoe UI", 14, FontStyle.Bold);
             title.AutoSize = true;
             title.Location = new Point(20, 20);
 
-            // SUBTITLE
-            Label subtitle = new Label();
+            // SUBTITLE
+            Label subtitle = new Label();
             subtitle.Text = "ACCOUNT INFORMATION";
             subtitle.ForeColor = Color.Gray;
             subtitle.Font = new Font("Segoe UI", 9, FontStyle.Bold);
             subtitle.Location = new Point(20, 60);
             subtitle.AutoSize = true;
 
-            // PANEL CARD
-            Panel card = new Panel();
+            // PANEL CARD
+            Panel card = new Panel();
             card.Size = new Size(480, 360);
             card.Location = new Point(20, 90);
-            card.BackColor = Color.FromArgb(35, 35, 35);
+            card.BackColor = Color.FromArgb(21, 27, 38);
 
-            // STYLE HELPERS
-            TextBox CreateBox(string placeholder, int x, int y, int w = 220)
+            // STYLE HELPERS
+            TextBox CreateBox(string placeholder, int x, int y, int w = 220)
             {
                 TextBox tb = new TextBox();
                 tb.Size = new Size(w, 28);
                 tb.Location = new Point(x, y);
-                tb.BackColor = Color.FromArgb(45, 45, 45);
+                tb.BackColor = Color.FromArgb(28, 36, 49);
                 tb.ForeColor = Color.White;
                 tb.BorderStyle = BorderStyle.FixedSingle;
                 tb.Text = placeholder;
@@ -63,62 +63,63 @@ namespace ApplicantPortal
                 return lbl;
             }
 
-            // FIRST NAME
-            Label fnLbl = CreateLabel("First name", 15, 15);
+            // FIRST NAME
+            Label fnLbl = CreateLabel("First name", 15, 15);
             TextBox txtFirst = CreateBox("", 15, 35);
 
-            // LAST NAME
-            Label lnLbl = CreateLabel("Last name", 250, 15);
+            // LAST NAME
+            Label lnLbl = CreateLabel("Last name", 250, 15);
             TextBox txtLast = CreateBox("", 250, 35);
 
-            // EMAIL
-            Label emailLbl = CreateLabel("Email address", 15, 75);
+            // EMAIL
+            Label emailLbl = CreateLabel("Email address", 15, 75);
             TextBox txtEmail = new TextBox();
             txtEmail.Size = new Size(440, 28);
             txtEmail.Location = new Point(15, 95);
-            txtEmail.BackColor = Color.FromArgb(45, 45, 45);
+            txtEmail.BackColor = Color.FromArgb(28, 36, 49);
             txtEmail.ForeColor = Color.White;
             txtEmail.Text = "";
 
-            // PASSWORD
-            Label passLbl = CreateLabel("Password", 15, 135);
+            // PASSWORD
+            Label passLbl = CreateLabel("Password", 15, 135);
             TextBox txtPass = CreateBox("", 15, 155);
             txtPass.UseSystemPasswordChar = true;
 
-            // CONFIRM PASSWORD
-            Label confirmLbl = CreateLabel("Confirm password", 250, 135);
+            // CONFIRM PASSWORD
+            Label confirmLbl = CreateLabel("Confirm password", 250, 135);
             TextBox txtConfirm = CreateBox("", 250, 155);
             txtConfirm.UseSystemPasswordChar = true;
 
-            // MOBILE
-            Label mobileLbl = CreateLabel("Mobile number", 15, 195);
+            // MOBILE
+            Label mobileLbl = CreateLabel("Mobile number", 15, 195);
             TextBox txtMobile = CreateBox("", 15, 215);
 
-            // DATE OF BIRTH
-            Label dobLbl = CreateLabel("Date of birth", 250, 195);
+            // DATE OF BIRTH
+            Label dobLbl = CreateLabel("Date of birth", 250, 195);
             DateTimePicker dob = new DateTimePicker();
             dob.Size = new Size(220, 28);
             dob.Location = new Point(250, 215);
             dob.Format = DateTimePickerFormat.Short;
-            dob.CalendarMonthBackground = Color.FromArgb(45, 45, 45);
+            dob.CalendarMonthBackground = Color.FromArgb(28, 36, 49);
 
-            // INFO BOX
-            Label info = new Label();
+            // INFO BOX
+            Label info = new Label();
             info.Text = "ℹ Duplicate emails will be rejected. Use different and active email.";
-            info.ForeColor = Color.LightSkyBlue;
-            info.BackColor = Color.FromArgb(30, 30, 30);
+            info.ForeColor = Color.FromArgb(96, 165, 250);
+            info.BackColor = Color.FromArgb(21, 27, 38);
             info.Size = new Size(440, 35);
             info.Location = new Point(15, 260);
             info.TextAlign = ContentAlignment.MiddleLeft;
 
-            // CREATE BUTTON
-            Button btnCreate = new Button();
+            // CREATE BUTTON
+            Button btnCreate = new Button();
             btnCreate.Text = "Create Account";
             btnCreate.Size = new Size(200, 35);
             btnCreate.Location = new Point(15, 310);
-            btnCreate.BackColor = Color.FromArgb(0, 120, 215);
+            btnCreate.BackColor = Color.FromArgb(66, 111, 230);
             btnCreate.ForeColor = Color.White;
             btnCreate.FlatStyle = FlatStyle.Flat;
+            btnCreate.FlatAppearance.BorderSize = 0;
 
             btnCreate.Click += (s, e) =>
             {
@@ -169,7 +170,6 @@ namespace ApplicantPortal
 
                         MessageBox.Show("Account Created Successfully!");
 
-                        // balik login
                         this.Hide();
                         new LoginForm().Show();
                     }
@@ -180,14 +180,15 @@ namespace ApplicantPortal
                 }
             };
 
-            // BACK BUTTON
-            Button btnBack = new Button();
+            // BACK BUTTON
+            Button btnBack = new Button();
             btnBack.Text = "Back to Login";
             btnBack.Size = new Size(200, 35);
             btnBack.Location = new Point(255, 310);
-            btnBack.BackColor = Color.FromArgb(55, 55, 55);
-            btnBack.ForeColor = Color.White;
+            btnBack.BackColor = Color.FromArgb(21, 27, 38);
+            btnBack.ForeColor = Color.FromArgb(59, 130, 246);
             btnBack.FlatStyle = FlatStyle.Flat;
+            btnBack.FlatAppearance.BorderSize = 0;
 
             btnBack.Click += (s, e) =>
             {
@@ -195,8 +196,8 @@ namespace ApplicantPortal
                 new LoginForm().Show();
             };
 
-            // ADD TO CARD
-            card.Controls.Add(fnLbl);
+            // ADD TO CARD
+            card.Controls.Add(fnLbl);
             card.Controls.Add(txtFirst);
             card.Controls.Add(lnLbl);
             card.Controls.Add(txtLast);
@@ -214,21 +215,19 @@ namespace ApplicantPortal
             card.Controls.Add(btnCreate);
             card.Controls.Add(btnBack);
 
-            // ADD TO FORM
-            this.Controls.Add(title);
+            // ADD TO FORM
+            this.Controls.Add(title);
             this.Controls.Add(subtitle);
             this.Controls.Add(card);
         }
-
 
         private void InitializeComponent()
         {
             SuspendLayout();
             ClientSize = new Size(284, 261);
-            Name = "RegisterForm ";
+            Name = "RegisterForm";
             Load += RegisterForm_Load;
             ResumeLayout(false);
-
         }
 
         private void RegisterForm_Load(object sender, EventArgs e)
