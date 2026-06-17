@@ -1,4 +1,4 @@
-﻿using project;
+using project;
 using System;
 using System.Data;
 using System.Drawing;
@@ -27,7 +27,6 @@ namespace HRApplicant
             p.Controls.Add(new Label { Text = "Job Vacancies", Font = new Font("Segoe UI", 15f, FontStyle.Bold), ForeColor = Color.FromArgb(220, 235, 228), Left = 28, Top = 18, AutoSize = true, BackColor = Color.Transparent });
             p.Controls.Add(new Label { Text = "Browse open positions and submit your application.", Font = new Font("Segoe UI", 9f), ForeColor = Color.FromArgb(100, 130, 115), Left = 29, Top = 46, AutoSize = true, BackColor = Color.Transparent });
 
-            // Search box
             TextBox txtSearch = new TextBox
             {
                 Left = 28,
@@ -42,7 +41,6 @@ namespace HRApplicant
             };
             txtSearch.GotFocus += (s, e) => { if (txtSearch.Text == "Search...") txtSearch.Text = ""; };
 
-            // Employment type filter
             ComboBox cmbType = new ComboBox
             {
                 Left = 298,
@@ -57,7 +55,6 @@ namespace HRApplicant
             cmbType.Items.AddRange(new object[] { "All Types", "Full-time", "Part-time", "Contractual" });
             cmbType.SelectedIndex = 0;
 
-            // Status filter
             ComboBox cmbStatus = new ComboBox
             {
                 Left = 440,
@@ -87,7 +84,6 @@ namespace HRApplicant
             };
             btnSearch.FlatAppearance.BorderSize = 0;
 
-            // Job list panel (scrollable)
             Panel listPanel = new Panel
             {
                 Left = 28,
@@ -123,27 +119,29 @@ namespace HRApplicant
                                ORDER BY jv.posted_at DESC";
 
                 DataTable dt = db.Query(sql,
-                    ("@kw", keyword),
-                    ("@kw2", "%" + keyword + "%"),
-                    ("@type", typeFilter),
-                    ("@open", openOnly ? 1 : 0));
+                    ("@kw", keyword), ("@kw2", "%" + keyword + "%"),
+                    ("@type", typeFilter), ("@open", openOnly ? 1 : 0));
 
-                // Get jobs this applicant already applied for
                 DataTable applied = db.Query(
-                    "SELECT job_vacancy_id FROM applications WHERE applicant_id=@aid",
+                    "SELECT job_vacancy_id, status FROM applications WHERE applicant_id=@aid",
                     ("@aid", project.Session.ApplicantId));
 
-                // Check if applicant already has an Accepted application
                 object acceptedCheck = db.Scalar(
                     "SELECT COUNT(*) FROM applications WHERE applicant_id=@aid AND status='Accepted'",
                     ("@aid", project.Session.ApplicantId));
+                bool hasAccepted = Convert.ToInt32(acceptedCheck) > 0;
 
-                bool hasAcceptedApplication = Convert.ToInt32(acceptedCheck) > 0;
-
-                System.Collections.Generic.HashSet<int> appliedIds = new System.Collections.Generic.HashSet<int>();
+                var appliedIds = new System.Collections.Generic.HashSet<int>();
+                var rejectedIds = new System.Collections.Generic.HashSet<int>();
 
                 foreach (DataRow r in applied.Rows)
-                    appliedIds.Add(Convert.ToInt32(r["job_vacancy_id"]));
+                {
+                    int jid = Convert.ToInt32(r["job_vacancy_id"]);
+                    if (r["status"].ToString() == "Rejected")
+                        rejectedIds.Add(jid);
+                    else
+                        appliedIds.Add(jid);
+                }
 
                 int cardTop = 0;
                 if (dt.Rows.Count == 0)
@@ -156,23 +154,18 @@ namespace HRApplicant
                 {
                     int jobId = Convert.ToInt32(row["id"]);
                     bool isOpen = row["status"].ToString() == "Open";
-                    bool alreadyApplied = appliedIds.Contains(jobId);
-
-                    if (hasAcceptedApplication)
-                    {
-                        alreadyApplied = true;
-                    }
-
+                    bool alreadyApplied = appliedIds.Contains(jobId) || hasAccepted;
+                    bool isRejected = rejectedIds.Contains(jobId);
                     string postedAt = Convert.ToDateTime(row["posted_at"]).ToString("MMM dd, yyyy");
 
                     Panel card = BuildJobCard(
                         jobId, row["title"].ToString(), row["department"].ToString(),
                         row["employment_type"].ToString(), row["slots"].ToString(),
-                        row["status"].ToString(), postedAt,
-                        row["qualifications"].ToString(),
-                        isOpen, alreadyApplied, listPanel.Width - 4, mainForm);
+                        row["status"].ToString(), postedAt, row["qualifications"].ToString(),
+                        isOpen, alreadyApplied, isRejected, listPanel.Width - 4, mainForm);
 
-                    card.Left = 0; card.Top = cardTop;
+                    card.Left = 0;
+                    card.Top = cardTop;
                     card.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
                     listPanel.Controls.Add(card);
                     cardTop += card.Height + 8;
@@ -186,23 +179,22 @@ namespace HRApplicant
 
         private Panel BuildJobCard(int jobId, string title, string dept, string type,
             string slots, string status, string posted, string qualifications,
-            bool isOpen, bool alreadyApplied, int width, ApplicantMainForm main)
+            bool isOpen, bool alreadyApplied, bool isRejected, int width, ApplicantMainForm main)
         {
             Panel card = new Panel { Width = width, Height = 110, BackColor = Color.FromArgb(22, 28, 24) };
             card.Paint += (s, e) =>
             {
-                Color borderCol = isOpen ? Color.FromArgb(35, 60, 44) : Color.FromArgb(50, 35, 35);
+                Color borderCol = isRejected ? Color.FromArgb(60, 30, 30) : isOpen ? Color.FromArgb(35, 60, 44) : Color.FromArgb(50, 35, 35);
                 Pen pen = new Pen(borderCol, 1);
                 e.Graphics.DrawRectangle(pen, 0, 0, card.Width - 1, card.Height - 1);
                 pen.Dispose();
             };
-            card.Controls.Add(new Panel { Left = 0, Top = 0, Width = 4, Height = 110, BackColor = isOpen ? Color.FromArgb(60, 180, 100) : Color.FromArgb(120, 60, 60) });
+            card.Controls.Add(new Panel { Left = 0, Top = 0, Width = 4, Height = 110, BackColor = isRejected ? Color.FromArgb(160, 50, 50) : isOpen ? Color.FromArgb(60, 180, 100) : Color.FromArgb(120, 60, 60) });
 
             card.Controls.Add(new Label { Text = title, Font = new Font("Segoe UI", 10.5f, FontStyle.Bold), ForeColor = isOpen ? Color.FromArgb(200, 230, 215) : Color.FromArgb(160, 140, 140), Left = 16, Top = 10, AutoSize = true, BackColor = Color.Transparent });
             card.Controls.Add(new Label { Text = dept + "   •   " + type + "   •   " + slots + " slot(s)   •   Posted: " + posted, Font = new Font("Segoe UI", 8f), ForeColor = Color.FromArgb(110, 130, 120), Left = 16, Top = 34, AutoSize = true, BackColor = Color.Transparent });
             card.Controls.Add(new Label { Text = qualifications, Font = new Font("Segoe UI", 8f), ForeColor = Color.FromArgb(90, 115, 102), Left = 16, Top = 56, Width = width - 200, Height = 18, AutoSize = false, BackColor = Color.Transparent });
 
-            // Status label
             Label lblSt = new Label
             {
                 Text = status.ToUpper(),
@@ -218,11 +210,12 @@ namespace HRApplicant
             };
             card.Controls.Add(lblSt);
 
-            // Apply button
             string btnText;
             Color btnBg;
             bool enabled;
-            if (alreadyApplied) { btnText = "Applied"; btnBg = Color.FromArgb(30, 55, 40); enabled = false; }
+
+            if (isRejected) { btnText = "Rejected"; btnBg = Color.FromArgb(60, 25, 25); enabled = false; }
+            else if (alreadyApplied) { btnText = "Applied"; btnBg = Color.FromArgb(30, 55, 40); enabled = false; }
             else if (!isOpen) { btnText = "Closed"; btnBg = Color.FromArgb(40, 35, 35); enabled = false; }
             else { btnText = "Apply"; btnBg = Color.FromArgb(30, 100, 60); enabled = true; }
 
@@ -235,7 +228,7 @@ namespace HRApplicant
                 Height = 30,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 BackColor = btnBg,
-                ForeColor = enabled ? Color.White : Color.FromArgb(120, 130, 125),
+                ForeColor = isRejected ? Color.FromArgb(200, 100, 100) : enabled ? Color.White : Color.FromArgb(120, 130, 125),
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 9f, FontStyle.Bold),
                 Cursor = enabled ? Cursors.Hand : Cursors.Default,
@@ -251,31 +244,20 @@ namespace HRApplicant
                 {
                     var db = new DatabaseConnection();
 
-                    // Applicant already accepted? Lock all future applications.
                     object acceptedCheck = db.Scalar(
                         "SELECT COUNT(*) FROM applications WHERE applicant_id=@aid AND status='Accepted'",
                         ("@aid", project.Session.ApplicantId));
-
                     if (Convert.ToInt32(acceptedCheck) > 0)
                     {
-                        MessageBox.Show(
-                            "You have already been accepted for a position and can no longer apply for other job vacancies.",
-                            "Application Locked",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Information);
-
+                        MessageBox.Show("You have already been accepted for a position and can no longer apply for other job vacancies.", "Application Locked", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return;
                     }
 
-                    var result = MessageBox.Show(
-                        "Apply for \"" + capturedTitle + "\"?\n\nThis will create a new Draft application.",
-                        "Confirm Application",
-                        MessageBoxButtons.YesNo,
-                        MessageBoxIcon.Question);
+                    var result = MessageBox.Show("Apply for \"" + capturedTitle + "\"?\n\nThis will create a new Draft application.", "Confirm Application", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                     if (result != DialogResult.Yes) return;
+
                     try
                     {
-                        // Business rule: no duplicate application
                         object dup = db.Scalar(
                             "SELECT COUNT(*) FROM applications WHERE applicant_id=@aid AND job_vacancy_id=@jid",
                             ("@aid", project.Session.ApplicantId), ("@jid", capturedJobId));
@@ -285,7 +267,6 @@ namespace HRApplicant
                             return;
                         }
 
-                        // Business rule: job must be open
                         object openCheck = db.Scalar("SELECT status FROM job_vacancies WHERE id=@jid", ("@jid", capturedJobId));
                         if (openCheck.ToString() != "Open")
                         {
@@ -297,12 +278,10 @@ namespace HRApplicant
                             "INSERT INTO applications (applicant_id, job_vacancy_id, status) VALUES (@aid,@jid,'Draft')",
                             ("@aid", project.Session.ApplicantId), ("@jid", capturedJobId));
 
-                        // Initial status history
                         db.Execute(
                             "INSERT INTO application_status_history (application_id, status, remarks, changed_by) VALUES (@id,'Draft','Application created.',@who)",
                             ("@id", newAppId), ("@who", project.Session.FullName));
 
-                        // Auto-create document slots for required types
                         DataTable reqTypes = db.Query("SELECT id FROM requirement_types WHERE is_active=1");
                         foreach (DataRow rt in reqTypes.Rows)
                         {
@@ -313,7 +292,7 @@ namespace HRApplicant
 
                         Audit.Log("Applied for job: " + capturedTitle, "applications", newAppId);
                         MessageBox.Show("Application created! Status: Draft.\nGo to My Application to fill in details.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        new ApplicantJobVacanciesPage(main); // refresh
+                        new ApplicantJobVacanciesPage(main);
                     }
                     catch (Exception ex)
                     {
@@ -325,23 +304,15 @@ namespace HRApplicant
             return card;
         }
 
-
         private void InitializeComponent()
         {
             SuspendLayout();
-            // 
-            // ApplicantStatusTrackingPage
-            // 
             ClientSize = new Size(284, 261);
             Name = "ApplicantJobVacanciesPage";
             Load += ApplicantJobVacanciesPage_Load;
             ResumeLayout(false);
-
         }
 
-        private void ApplicantJobVacanciesPage_Load(object sender, EventArgs e)
-        {
-
-        }
+        private void ApplicantJobVacanciesPage_Load(object sender, EventArgs e) { }
     }
 }
